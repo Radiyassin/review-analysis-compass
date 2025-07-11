@@ -1,24 +1,35 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>review-analysis-compass</title>
-    <meta name="description" content="Lovable Generated Project" />
+    <title>Sentiment Analysis Dashboard</title>
+    <meta name="description" content="Advanced Sentiment Analysis Dashboard for Customer Reviews" />
     <meta name="author" content="Lovable" />
 
-    <meta property="og:title" content="review-analysis-compass" />
-    <meta property="og:description" content="Lovable Generated Project" />
+    <meta property="og:title" content="Sentiment Analysis Dashboard" />
+    <meta property="og:description" content="Advanced Sentiment Analysis Dashboard for Customer Reviews" />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@lovable_dev" />
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    
+    <!-- External libraries for compatibility -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/holtzy/D3-graph-gallery@master/LIB/d3.layout.cloud.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
   </head>
 
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script src="/js/main.js"></script>
   </body>
 </html>
