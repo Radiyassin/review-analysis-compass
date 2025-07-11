@@ -1,10 +1,66 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Upload, FileText, CheckCircle } from 'lucide-react';
 
 const FileUpload = () => {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  // Initialize the drag and drop functionality from main.js when component mounts
+  useEffect(() => {
+    // This ensures the main.js file upload logic is initialized
+    const script = document.createElement('script');
+    script.innerHTML = `
+      document.querySelectorAll(".drop-zone__input").forEach((inputElement) => {
+        const dropZoneElement = inputElement.closest(".drop-zone");
+        if (!dropZoneElement.hasAttribute('data-initialized')) {
+          dropZoneElement.setAttribute('data-initialized', 'true');
+          
+          dropZoneElement.addEventListener("click", () => inputElement.click());
+
+          inputElement.addEventListener("change", () => {
+            if (inputElement.files.length) {
+              updateThumbnail(dropZoneElement, inputElement.files[0]);
+            }
+          });
+
+          dropZoneElement.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            dropZoneElement.classList.add("drop-zone--over");
+          });
+
+          ["dragleave", "dragend", "drop"].forEach((type) => {
+            dropZoneElement.addEventListener(type, () => {
+              dropZoneElement.classList.remove("drop-zone--over");
+            });
+          });
+
+          dropZoneElement.addEventListener("drop", (e) => {
+            e.preventDefault();
+            if (e.dataTransfer.files.length) {
+              inputElement.files = e.dataTransfer.files;
+              updateThumbnail(dropZoneElement, e.dataTransfer.files[0]);
+            }
+          });
+        }
+      });
+
+      function updateThumbnail(dropZoneElement, file) {
+        let thumb = dropZoneElement.querySelector(".drop-zone__thumb");
+        if (!thumb) {
+          thumb = document.createElement("div");
+          thumb.classList.add("drop-zone__thumb");
+          dropZoneElement.appendChild(thumb);
+        }
+        thumb.textContent = \`Selected file: \${file.name}\`;
+      }
+    `;
+    document.head.appendChild(script);
+
+    return () => {
+      document.head.removeChild(script);
+    };
+  }, []);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();

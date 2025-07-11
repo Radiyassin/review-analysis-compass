@@ -30,6 +30,16 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <script src="/js/main.js"></script>
+    <!-- Load main.js after React app is initialized -->
+    <script>
+      window.addEventListener('DOMContentLoaded', function() {
+        const script = document.createElement('script');
+        script.src = '/js/main.js';
+        script.onload = function() {
+          console.log('main.js loaded successfully');
+        };
+        document.head.appendChild(script);
+      });
+    </script>
   </body>
 </html>
