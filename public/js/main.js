@@ -30,8 +30,14 @@ async function analyze() {
             body: formData
         });
 
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Server response:', errorText);
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Upload failed');
+        console.log('Analysis data received:', data);
 
         document.getElementById('results').style.display = 'block';
 
@@ -51,6 +57,7 @@ async function analyze() {
         }
 
     } catch (err) {
+        console.error('Analysis error:', err);
         alert('Analysis failed: ' + err.message);
     } finally {
         if (analyzeBtn) {
@@ -304,9 +311,14 @@ async function askBot() {
             body: JSON.stringify({ question })
         });
 
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
         const data = await response.json();
         appendMessage('bot', data.answer || 'Sorry, no response.');
     } catch (err) {
+        console.error('Chat error:', err);
         appendMessage('bot', 'An error occurred while contacting the assistant.');
     }
 }

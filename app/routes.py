@@ -30,24 +30,29 @@ def serve_static(path):
 # API Routes
 @main_bp.route('/api/upload', methods=['POST'])
 def upload_file():
-    if 'file' not in request.files:
-        return jsonify({"error": "No file uploaded"}), 400
-
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({"error": "No selected file"}), 400
-
     try:
+        if 'file' not in request.files:
+            return jsonify({"error": "No file uploaded"}), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({"error": "No selected file"}), 400
+
+        # Ensure uploads directory exists
         os.makedirs('uploads', exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         file_path = f"uploads/{timestamp}_{file.filename}"
         file.save(file_path)
 
+        # Read CSV file
         try:
             df = pd.read_csv(file_path)
+            print(f"CSV loaded successfully with {len(df)} rows and columns: {list(df.columns)}")
         except Exception as e:
+            print(f"Error reading CSV: {str(e)}")
             return jsonify({"error": f"Failed to read CSV: {str(e)}"}), 400
 
+        # Check required columns
         required_columns = ['Reviews']
         missing_cols = [col for col in required_columns if col not in df.columns]
         if missing_cols:
@@ -56,17 +61,23 @@ def upload_file():
                 "available_columns": list(df.columns)
             }), 400
 
+        # Clean data
         df = df.dropna(subset=['Reviews'])
+        print(f"After cleaning: {len(df)} rows remaining")
 
+        # Analyze sentiment
         from app.utils.nlp_processor import analyze_sentiment, extract_common_phrases
         df = analyze_sentiment(df, 'Reviews')
+        print(f"Sentiment analysis completed")
 
+        # Extract product info
         product_info = {
-            "Product Name": str(df['Product Name'].iloc[0]) if 'Product Name' in df.columns else 'N/A',
-            "Brand Name": str(df['Brand Name'].iloc[0]) if 'Brand Name' in df.columns else 'N/A',
-            "Price": float(df['Price'].iloc[0]) if 'Price' in df.columns else 'N/A'
+            "Product Name": str(df['Product Name'].iloc[0]) if 'Product Name' in df.columns and len(df) > 0 else 'N/A',
+            "Brand Name": str(df['Brand Name'].iloc[0]) if 'Brand Name' in df.columns and len(df) > 0 else 'N/A',
+            "Price": float(df['Price'].iloc[0]) if 'Price' in df.columns and len(df) > 0 and pd.notna(df['Price'].iloc[0]) else 'N/A'
         }
 
+        # Count complaints by category
         def count_complaints_by_category(reviews):
             categories = {
                 "screen": ["screen", "display", "touch", "brightness"],
@@ -85,14 +96,15 @@ def upload_file():
 
         complaint_summary = count_complaints_by_category(df[df['sentiment'] == 'negative']['Reviews'])
 
+        # Prepare chart data
+        pos_sentiment_mean = float(df[df['sentiment'] == 'positive']['sentiment_score'].mean()) if len(df[df['sentiment'] == 'positive']) > 0 else 0
+        neg_sentiment_mean = float(df[df['sentiment'] == 'negative']['sentiment_score'].mean()) if len(df[df['sentiment'] == 'negative']) > 0 else 0
+
         response_data = {
             "chart_data": {
                 "sentiment": {
                     "labels": ["Positive", "Negative"],
-                    "means": [
-                        float(df[df['sentiment'] == 'positive']['sentiment_score'].mean() or 0),
-                        float(df[df['sentiment'] == 'negative']['sentiment_score'].mean() or 0)
-                    ]
+                    "means": [pos_sentiment_mean, neg_sentiment_mean]
                 },
                 "distribution": {
                     "labels": ["Positive", "Neutral", "Negative"],
@@ -113,56 +125,68 @@ def upload_file():
             "complaint_categories": complaint_summary
         }
 
+        # Handle ratings if available
         if 'Rating' in df.columns:
             try:
                 df['Rating'] = pd.to_numeric(df['Rating'], errors='coerce')
-                df = df.dropna(subset=['Rating'])
+                df_with_ratings = df.dropna(subset=['Rating'])
 
-                response_data["rating_stats"] = {
-                    "average_rating": float(df['Rating'].mean()),
-                    "rating_distribution": {
-                        str(i): int(df['Rating'].value_counts().get(i, 0)) 
-                        for i in range(1, 6)
-                    },
-                    "sentiment_mean": float(df['sentiment_score'].mean()),
-                    "comparison_score": float((df['Rating'].mean()/5) - df['sentiment_score'].mean())
-                }
+                if len(df_with_ratings) > 0:
+                    response_data["rating_stats"] = {
+                        "average_rating": float(df_with_ratings['Rating'].mean()),
+                        "rating_distribution": {
+                            str(i): int(df_with_ratings['Rating'].value_counts().get(i, 0)) 
+                            for i in range(1, 6)
+                        },
+                        "sentiment_mean": float(df['sentiment_score'].mean()),
+                        "comparison_score": float((df_with_ratings['Rating'].mean()/5) - df['sentiment_score'].mean())
+                    }
             except Exception as e:
                 print(f"Error processing ratings: {str(e)}")
 
         # Add predicted sales trend based on sentiment
-        avg_sentiment = df['sentiment_score'].mean()
-        if avg_sentiment > 0.5:
+        avg_sentiment = float(df['sentiment_score'].mean())
+        if avg_sentiment > 0.05:
             trend = 'Up'
-        elif avg_sentiment < -0.2:
+        elif avg_sentiment < -0.05:
             trend = 'Down'
         else:
             trend = 'Stable'
 
-        response_data["sentiment_score"] = float(avg_sentiment)
+        response_data["sentiment_score"] = avg_sentiment
         response_data["sales_trend"] = {
-            "avg_sentiment": round(float(avg_sentiment), 2),
+            "avg_sentiment": round(avg_sentiment, 2),
             "trend": trend,
             "message": f"Predicted sales trend is {trend.lower()} based on sentiment."
         }
+        
+        # Store context for chat
         session['reviews_text'] = " ".join(df['Reviews'].astype(str).tolist())[:3000]
+        
+        print("Response data prepared successfully")
         return jsonify(response_data)
 
     except Exception as e:
-        print(f"Server error: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
+        print(f"Server error in upload_file: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Internal server error: {str(e)}"}), 500
     
 @main_bp.route('/api/chat', methods=['POST'])
 def chat():
-    client = openai.OpenAI(api_key=current_app.config['OPENAI_API_KEY'])
+    try:
+        if not current_app.config.get('OPENAI_API_KEY'):
+            return jsonify({'answer': "OpenAI API key not configured. Please set OPENAI_API_KEY environment variable."})
 
-    question = request.json.get('question', '')
-    context = session.get('reviews_text', '')
+        client = openai.OpenAI(api_key=current_app.config['OPENAI_API_KEY'])
 
-    if not context:
-        return jsonify({'answer': "Please upload a product review file first."})
+        question = request.json.get('question', '')
+        context = session.get('reviews_text', '')
 
-    prompt = f"""You are a helpful assistant that answers questions based on product reviews. 
+        if not context:
+            return jsonify({'answer': "Please upload a product review file first."})
+
+        prompt = f"""You are a helpful assistant that answers questions based on product reviews. 
 Here are some customer reviews:
 ---
 {context}
@@ -170,7 +194,6 @@ Here are some customer reviews:
 Now answer this question: {question}
 """
 
-    try:
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
@@ -185,4 +208,5 @@ Now answer this question: {question}
         return jsonify({'answer': answer})
     except Exception as e:
         print(f"OpenAI error: {e}")
-        return jsonify({'answer': "Something went wrong calling OpenAI."})
+        return jsonify({'answer': f"Error: {str(e)}"})
+
