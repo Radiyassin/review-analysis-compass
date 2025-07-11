@@ -26,17 +26,23 @@ const Index = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  const analyze = () => {
+  const handleAnalyze = () => {
     setIsAnalyzing(true);
-    // Simulate analysis process
-    setTimeout(() => {
-      setIsAnalyzing(false);
-      setShowResults(true);
-      // Here you would integrate with your existing main.js analyze function
-      if (window.analyze) {
-        window.analyze();
-      }
-    }, 2000);
+    setShowResults(true);
+    
+    // Call the main.js analyze function if available
+    if (typeof window !== 'undefined' && window.analyze) {
+      window.analyze().then(() => {
+        setIsAnalyzing(false);
+      }).catch(() => {
+        setIsAnalyzing(false);
+      });
+    } else {
+      // Fallback simulation
+      setTimeout(() => {
+        setIsAnalyzing(false);
+      }, 2000);
+    }
   };
 
   if (showIntro) {
@@ -81,7 +87,7 @@ const Index = () => {
               <FileUpload />
               <div className="text-center mt-6">
                 <Button 
-                  onClick={analyze}
+                  onClick={handleAnalyze}
                   disabled={isAnalyzing}
                   className="btn-blue px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
                 >
@@ -160,19 +166,8 @@ const Index = () => {
 
       {/* Chatbot */}
       <Chatbot />
-
-      {/* Add the main.js script integration */}
-      <script src="/js/main.js"></script>
     </div>
   );
 };
-
-// Make analyze function available globally for main.js integration
-if (typeof window !== 'undefined') {
-  window.analyze = () => {
-    // Your existing analyze logic from main.js
-    console.log('Analyze function called');
-  };
-}
 
 export default Index;

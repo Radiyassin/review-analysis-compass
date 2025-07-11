@@ -11,15 +11,25 @@ const Chatbot = () => {
 
   const toggleChatbot = () => {
     setIsOpen(!isOpen);
+    // Also call the main.js function if available
+    if (typeof window !== 'undefined' && window.toggleChatbot) {
+      window.toggleChatbot();
+    }
   };
 
-  const askBot = () => {
+  const askBot = async () => {
     if (inputValue.trim()) {
       setMessages(prev => [...prev, { type: 'user', text: inputValue }]);
-      // Simulate bot response
-      setTimeout(() => {
-        setMessages(prev => [...prev, { type: 'bot', text: 'Thanks for your question! I\'m here to help with your sentiment analysis.' }]);
-      }, 1000);
+      
+      // Call the main.js function if available
+      if (typeof window !== 'undefined' && window.askBot) {
+        await window.askBot();
+      } else {
+        // Fallback response
+        setTimeout(() => {
+          setMessages(prev => [...prev, { type: 'bot', text: 'Thanks for your question! I\'m here to help with your sentiment analysis.' }]);
+        }, 1000);
+      }
       setInputValue('');
     }
   };
@@ -103,16 +113,5 @@ const Chatbot = () => {
     </>
   );
 };
-
-// Make functions available globally for main.js integration
-if (typeof window !== 'undefined') {
-  window.toggleChatbot = () => {
-    // This will be handled by React state
-  };
-  
-  window.askBot = () => {
-    // This will be handled by React state
-  };
-}
 
 export default Chatbot;
