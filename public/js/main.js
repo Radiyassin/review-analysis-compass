@@ -25,7 +25,7 @@ async function analyze() {
         const formData = new FormData();
         formData.append('file', fileInput.files[0]);
 
-        const response = await fetch('/upload', {
+        const response = await fetch('/api/upload', {
             method: 'POST',
             body: formData
         });
@@ -298,7 +298,7 @@ async function askBot() {
     input.value = '';
     
     try {
-        const response = await fetch('/chat', {
+        const response = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ question })
