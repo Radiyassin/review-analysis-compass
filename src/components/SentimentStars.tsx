@@ -10,11 +10,11 @@ const SentimentStars = () => {
   });
 
   useEffect(() => {
-    console.log('🌟 SentimentStars component mounted');
+    console.log('🌟 SentimentStars component mounted and initializing...');
 
     // Function to update sentiment data
     const updateSentimentData = (sentimentScore: number) => {
-      console.log('🌟 SentimentStars: Updating with score:', sentimentScore);
+      console.log('🌟 SentimentStars: UPDATING with score:', sentimentScore);
       const clampedScore = Math.max(-1, Math.min(1, sentimentScore));
       const scoreOutOf5 = ((clampedScore + 1) / 2) * 5;
       
@@ -22,33 +22,50 @@ const SentimentStars = () => {
         score: sentimentScore,
         rating: scoreOutOf5
       });
-      console.log('🌟 SentimentStars: Updated to rating:', scoreOutOf5);
+      console.log('🌟 SentimentStars: STATE UPDATED - Rating:', scoreOutOf5, 'Score:', sentimentScore);
     };
 
     let unsubscribe: (() => void) | null = null;
+    let retryCount = 0;
+    const MAX_RETRIES = 50; // Increase retry attempts
     
     const initializeDataStore = () => {
+      retryCount++;
+      console.log(`🌟 SentimentStars: Initialization attempt ${retryCount}/${MAX_RETRIES}`);
+      
       if (typeof window !== 'undefined' && window.dataStore) {
-        console.log('🌟 SentimentStars: Data store found, subscribing');
+        console.log('🌟 SentimentStars: ✅ DataStore found! Subscribing to updates...');
         
         // Check for existing data
         const existingScore = window.dataStore.getData('sentimentScore');
-        if (typeof existingScore === 'number') {
-          console.log('🌟 SentimentStars: Found existing score:', existingScore);
+        console.log('🌟 SentimentStars: Checking existing data - Score:', existingScore);
+        
+        if (typeof existingScore === 'number' && existingScore !== 0) {
+          console.log('🌟 SentimentStars: Found existing score, updating immediately:', existingScore);
           updateSentimentData(existingScore);
         }
         
         // Subscribe to changes
-        unsubscribe = window.dataStore.subscribe((key: string, value: any) => {
-          console.log('🌟 SentimentStars: Data store update:', key, value);
+        unsubscribe = window.dataStore.subscribe((key: string, value: any, allData: any) => {
+          console.log('🌟 SentimentStars: DataStore notification received!');
+          console.log('🌟 Key:', key, 'Value:', value);
+          console.log('🌟 All data:', allData);
+          
           if (key === 'sentimentScore' && typeof value === 'number') {
+            console.log('🌟 SentimentStars: Sentiment score updated via subscription:', value);
             updateSentimentData(value);
           }
         });
+        
+        console.log('🌟 SentimentStars: Successfully subscribed to DataStore');
+        
       } else {
-        console.log('🌟 SentimentStars: Data store not available, will retry...');
-        // Retry after a short delay
-        setTimeout(initializeDataStore, 100);
+        if (retryCount < MAX_RETRIES) {
+          console.log('🌟 SentimentStars: DataStore not ready, retrying in 100ms...');
+          setTimeout(initializeDataStore, 100);
+        } else {
+          console.error('🌟 SentimentStars: ❌ DataStore not available after maximum retries');
+        }
       }
     };
 
@@ -57,17 +74,24 @@ const SentimentStars = () => {
 
     // Also listen for the analysis completion event
     const handleAnalysisComplete = (event: CustomEvent) => {
-      console.log('🌟 SentimentStars: Analysis completed event received', event.detail);
+      console.log('🌟 SentimentStars: 📢 Analysis completed event received!');
+      console.log('🌟 Event detail:', event.detail);
+      
       if (event.detail && typeof event.detail.sentiment_score === 'number') {
+        console.log('🌟 SentimentStars: Updating from event - Score:', event.detail.sentiment_score);
         updateSentimentData(event.detail.sentiment_score);
+      } else {
+        console.log('🌟 SentimentStars: No sentiment score in event detail');
       }
     };
 
     window.addEventListener('analysisCompleted', handleAnalysisComplete as EventListener);
+    console.log('🌟 SentimentStars: Event listener added for analysisCompleted');
 
     return () => {
+      console.log('🌟 SentimentStars: Component unmounting, cleaning up...');
       if (unsubscribe) {
-        console.log('🌟 SentimentStars: Cleaning up subscription');
+        console.log('🌟 SentimentStars: Removing DataStore subscription');
         unsubscribe();
       }
       window.removeEventListener('analysisCompleted', handleAnalysisComplete as EventListener);
@@ -98,6 +122,8 @@ const SentimentStars = () => {
       </div>
     );
   };
+
+  console.log('🌟 SentimentStars: Rendering with data:', sentimentData);
 
   return (
     <Card className="shadow-lg border-0 bg-gradient-to-r from-yellow-50 to-orange-50">

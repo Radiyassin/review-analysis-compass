@@ -118,7 +118,7 @@ if (window.mainAppLoaded) {
 
     // Main analyze function
     window.analyze = async function() {
-        console.log('=== ANALYZE FUNCTION CALLED ===');
+        console.log('🚀 === ANALYZE FUNCTION CALLED ===');
         
         const selectedFile = window.selectedCsvFile;
         if (!selectedFile) {
@@ -126,75 +126,117 @@ if (window.mainAppLoaded) {
             return;
         }
 
-        console.log('Selected file:', selectedFile.name, 'Size:', selectedFile.size);
+        console.log('📁 Selected file:', selectedFile.name, 'Size:', selectedFile.size);
         
-        // Show loading state - try multiple selectors
-        const analyzeBtns = [
-            document.querySelector('button[class*="bg-gradient-to-r"][class*="from-blue-600"]'),
-            document.querySelector('.btn-blue'),
-            document.querySelector('[class*="Analyze"]')
+        // Show loading state with multiple button selectors
+        const buttonSelectors = [
+            'button[class*="bg-gradient-to-r"][class*="from-blue-600"]',
+            '.btn-blue',
+            'button:has(svg)',
+            'button[class*="Analyze"]',
+            'button[disabled="false"]'
         ];
         
-        let analyzeBtn = analyzeBtns.find(btn => btn !== null);
-        console.log('Found analyze button:', analyzeBtn);
+        let analyzeBtn = null;
+        for (const selector of buttonSelectors) {
+            analyzeBtn = document.querySelector(selector);
+            if (analyzeBtn && analyzeBtn.textContent.includes('Analyze')) {
+                console.log('🎯 Found analyze button with selector:', selector);
+                break;
+            }
+        }
         
         if (analyzeBtn) {
+            console.log('💫 Setting button to loading state...');
             analyzeBtn.disabled = true;
+            const originalContent = analyzeBtn.innerHTML;
             analyzeBtn.innerHTML = '<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>Analyzing...';
-            console.log('Button updated to loading state');
+            console.log('✅ Button updated to loading state');
+            
+            // Store original content for reset
+            analyzeBtn._originalContent = originalContent;
         } else {
-            console.warn('Analyze button not found!');
+            console.warn('⚠️ Analyze button not found with any selector!');
+            console.log('Available buttons:', Array.from(document.querySelectorAll('button')).map(b => ({
+                text: b.textContent,
+                classes: b.className
+            })));
         }
 
         try {
-            // Upload and analyze file
-            console.log('Starting API call...');
+            console.log('📡 Starting API call...');
             const data = await ApiService.uploadFile(selectedFile);
-            console.log('API call completed, received data:', data);
+            console.log('✅ API call completed successfully');
+            console.log('📊 Received data structure:', Object.keys(data));
+            console.log('📈 Full response data:', data);
 
             if (!data.success && !data.chart_data) {
                 throw new Error('Invalid response from server');
             }
 
-            console.log('=== STORING DATA IN DATASTORE ===');
+            console.log('💾 === STORING DATA IN DATASTORE ===');
             
             // Store all data in the centralized data store
             if (window.dataStore) {
-                console.log('DataStore found, storing data...');
+                console.log('🗄️ DataStore found, storing analysis results...');
+                
+                // Log each piece of data being stored
+                console.log('🌟 Storing sentiment score:', data.sentiment_score);
                 window.dataStore.setData('sentimentScore', data.sentiment_score || 0);
+                
+                console.log('📈 Storing sales trend:', data.sales_trend);  
                 window.dataStore.setData('salesTrend', data.sales_trend || { trend: 'Stable', avg_sentiment: 0, message: 'No data' });
+                
+                console.log('🏷️ Storing product info:', data.product_info);
                 window.dataStore.setData('productInfo', data.product_info || { 'Product Name': 'N/A', 'Brand Name': 'N/A', 'Price': 'N/A' });
+                
+                console.log('📊 Storing chart data:', data.chart_data);
                 window.dataStore.setData('chartData', data.chart_data || {});
+                
+                console.log('💬 Storing common phrases:', data.common_phrases);
                 window.dataStore.setData('commonPhrases', data.common_phrases || []);
+                
                 window.dataStore.setData('analysisComplete', true);
                 
-                console.log('=== DATA STORED, CURRENT DATASTORE CONTENTS ===');
-                console.log(window.dataStore.getAllData());
+                console.log('🔍 === FINAL DATASTORE CONTENTS ===');
+                const allData = window.dataStore.getAllData();
+                console.log('Complete data store contents:', allData);
+                
+                // Verify each key exists
+                Object.keys(allData).forEach(key => {
+                    console.log(`✓ ${key}:`, allData[key]);
+                });
+                
             } else {
-                console.error('DataStore not found!');
+                console.error('❌ DataStore not found!');
             }
 
             // Update DOM-based UI components
             if (window.DOMUpdater) {
-                console.log('Updating DOM components...');
+                console.log('🖼️ Updating DOM components...');
                 DOMUpdater.updateProductInfo(data.product_info || {});
                 DOMUpdater.updatePhrases(data.common_phrases || []);
             }
             
             if (data.chart_data && window.ChartManager) {
-                console.log('Updating charts...');
+                console.log('📊 Updating charts...');
                 ChartManager.update(data.chart_data);
             }
 
             // Dispatch custom event for React components
-            console.log('Dispatching analysisCompleted event...');
-            const event = new CustomEvent('analysisCompleted', { detail: data });
+            console.log('📢 Dispatching analysisCompleted event...');
+            const event = new CustomEvent('analysisCompleted', { 
+                detail: data,
+                bubbles: true
+            });
             window.dispatchEvent(event);
+            console.log('✅ Event dispatched successfully');
 
-            console.log('=== ANALYSIS PROCESS COMPLETED ===');
+            console.log('🎉 === ANALYSIS PROCESS COMPLETED SUCCESSFULLY ===');
             
         } catch (error) {
-            console.error('Analysis failed:', error);
+            console.error('💥 Analysis failed:', error);
+            console.error('Error details:', error.message, error.stack);
             alert(`Analysis failed: ${error.message}`);
             if (window.dataStore) {
                 window.dataStore.setData('analysisComplete', false);
@@ -202,12 +244,13 @@ if (window.mainAppLoaded) {
         } finally {
             // Reset button state
             if (analyzeBtn) {
+                console.log('🔄 Resetting button state...');
                 analyzeBtn.disabled = false;
-                analyzeBtn.innerHTML = '<svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>Analyze CSV';
-                console.log('Button reset to original state');
+                analyzeBtn.innerHTML = analyzeBtn._originalContent || '<svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>Analyze CSV';
+                console.log('✅ Button reset completed');
             }
         }
     };
 
-    console.log('Main application loaded');
+    console.log('🚀 Main application loaded and ready');
 }
