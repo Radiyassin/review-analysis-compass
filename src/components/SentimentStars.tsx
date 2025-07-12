@@ -25,41 +25,39 @@ const SentimentStars = () => {
       console.log('🌟 SentimentStars: Updated to rating:', scoreOutOf5);
     };
 
-    // Listen for sentiment data updates
-    const handleSentimentUpdate = (event: CustomEvent) => {
-      console.log('🌟 SentimentStars: Received event:', event.detail);
-      const { sentimentScore } = event.detail;
-      if (typeof sentimentScore === 'number') {
-        updateSentimentData(sentimentScore);
+    // Subscribe to data store changes
+    let unsubscribe: (() => void) | null = null;
+    
+    const initializeDataStore = () => {
+      if (typeof window !== 'undefined' && window.dataStore) {
+        console.log('🌟 SentimentStars: Subscribing to data store');
+        
+        // Check for existing data
+        const existingScore = window.dataStore.getData('sentimentScore');
+        if (typeof existingScore === 'number') {
+          console.log('🌟 SentimentStars: Found existing score:', existingScore);
+          updateSentimentData(existingScore);
+        }
+        
+        // Subscribe to changes
+        unsubscribe = window.dataStore.subscribe((key: string, value: any) => {
+          console.log('🌟 SentimentStars: Data store update:', key, value);
+          if (key === 'sentimentScore' && typeof value === 'number') {
+            updateSentimentData(value);
+          }
+        });
+      } else {
+        console.log('🌟 SentimentStars: Data store not ready, retrying...');
+        setTimeout(initializeDataStore, 100);
       }
     };
 
-    // Check for existing global data first
-    const checkGlobalData = () => {
-      console.log('🌟 SentimentStars: Checking global data...');
-      if (typeof window !== 'undefined' && (window as any).currentSentimentScore !== undefined) {
-        const sentimentScore = (window as any).currentSentimentScore;
-        console.log('🌟 SentimentStars: Found global sentiment score:', sentimentScore);
-        updateSentimentData(sentimentScore);
-        return true;
-      }
-      return false;
-    };
-
-    // Try to get existing data immediately
-    if (!checkGlobalData()) {
-      console.log('🌟 SentimentStars: No existing data, waiting for events...');
-    }
-
-    // Add event listeners
-    window.addEventListener('sentimentDataUpdate', handleSentimentUpdate as EventListener);
-    window.addEventListener('analysisCompleted', () => {
-      console.log('🌟 SentimentStars: Analysis completed, checking for data...');
-      setTimeout(() => checkGlobalData(), 100);
-    });
+    initializeDataStore();
 
     return () => {
-      window.removeEventListener('sentimentDataUpdate', handleSentimentUpdate as EventListener);
+      if (unsubscribe) {
+        unsubscribe();
+      }
     };
   }, []);
 

@@ -21,40 +21,39 @@ const SalesForecast = () => {
       setTrendData(data);
     };
 
-    // Listen for sales trend updates
-    const handleSalesTrendUpdate = (event: CustomEvent) => {
-      console.log('📈 SalesForecast: Received event:', event.detail);
-      if (event.detail && typeof event.detail === 'object') {
-        updateTrendData(event.detail);
+    // Subscribe to data store changes
+    let unsubscribe: (() => void) | null = null;
+    
+    const initializeDataStore = () => {
+      if (typeof window !== 'undefined' && window.dataStore) {
+        console.log('📈 SalesForecast: Subscribing to data store');
+        
+        // Check for existing data
+        const existingTrend = window.dataStore.getData('salesTrend');
+        if (existingTrend && typeof existingTrend === 'object') {
+          console.log('📈 SalesForecast: Found existing trend:', existingTrend);
+          updateTrendData(existingTrend);
+        }
+        
+        // Subscribe to changes
+        unsubscribe = window.dataStore.subscribe((key: string, value: any) => {
+          console.log('📈 SalesForecast: Data store update:', key, value);
+          if (key === 'salesTrend' && value && typeof value === 'object') {
+            updateTrendData(value);
+          }
+        });
+      } else {
+        console.log('📈 SalesForecast: Data store not ready, retrying...');
+        setTimeout(initializeDataStore, 100);
       }
     };
 
-    // Check for existing global data
-    const checkGlobalData = () => {
-      console.log('📈 SalesForecast: Checking global data...');
-      if (typeof window !== 'undefined' && (window as any).currentSalesTrend) {
-        const salesTrend = (window as any).currentSalesTrend;
-        console.log('📈 SalesForecast: Found global sales trend:', salesTrend);
-        updateTrendData(salesTrend);
-        return true;
-      }
-      return false;
-    };
-
-    // Try to get existing data immediately
-    if (!checkGlobalData()) {
-      console.log('📈 SalesForecast: No existing data, waiting for events...');
-    }
-
-    // Add event listeners
-    window.addEventListener('salesTrendUpdate', handleSalesTrendUpdate as EventListener);
-    window.addEventListener('analysisCompleted', () => {
-      console.log('📈 SalesForecast: Analysis completed, checking for data...');
-      setTimeout(() => checkGlobalData(), 100);
-    });
+    initializeDataStore();
 
     return () => {
-      window.removeEventListener('salesTrendUpdate', handleSalesTrendUpdate as EventListener);
+      if (unsubscribe) {
+        unsubscribe();
+      }
     };
   }, []);
 
