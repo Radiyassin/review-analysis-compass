@@ -9,6 +9,7 @@ import ChartsContainer from '@/components/ChartsContainer';
 import WordCloud from '@/components/WordCloud';
 import CommonPhrases from '@/components/CommonPhrases';
 import Chatbot from '@/components/Chatbot';
+import NewChatbot from '@/components/NewChatbot';
 import IntroGif from '@/components/IntroGif';
 import SalesForecast from '@/components/SalesForecast';
 import DownloadReport from '@/components/DownloadReport';
@@ -196,7 +197,7 @@ const Index = () => {
       </div>
 
       {/* Chatbot */}
-      <Chatbot />
+      <NewChatbot />
     </div>
   );
 };
