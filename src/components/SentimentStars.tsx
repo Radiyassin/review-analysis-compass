@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Star } from 'lucide-react';
@@ -7,6 +8,7 @@ const SentimentStars = () => {
     score: 0,
     rating: 0
   });
+  const [isDataStoreReady, setIsDataStoreReady] = useState(false);
 
   useEffect(() => {
     console.log('🌟 SentimentStars component mounted');
@@ -24,12 +26,19 @@ const SentimentStars = () => {
       console.log('🌟 SentimentStars: Updated to rating:', scoreOutOf5);
     };
 
-    // Subscribe to data store changes
     let unsubscribe: (() => void) | null = null;
+    let retryCount = 0;
+    const maxRetries = 50; // Limit retries to prevent infinite loops
     
     const initializeDataStore = () => {
+      if (retryCount >= maxRetries) {
+        console.warn('🌟 SentimentStars: Max retries reached, stopping');
+        return;
+      }
+
       if (typeof window !== 'undefined' && window.dataStore) {
-        console.log('🌟 SentimentStars: Subscribing to data store');
+        console.log('🌟 SentimentStars: Data store found, subscribing');
+        setIsDataStoreReady(true);
         
         // Check for existing data
         const existingScore = window.dataStore.getData('sentimentScore');
@@ -38,7 +47,7 @@ const SentimentStars = () => {
           updateSentimentData(existingScore);
         }
         
-        // Subscribe to changes
+        // Subscribe to changes only once
         unsubscribe = window.dataStore.subscribe((key: string, value: any) => {
           console.log('🌟 SentimentStars: Data store update:', key, value);
           if (key === 'sentimentScore' && typeof value === 'number') {
@@ -46,8 +55,11 @@ const SentimentStars = () => {
           }
         });
       } else {
-        console.log('🌟 SentimentStars: Data store not ready, retrying...');
-        setTimeout(initializeDataStore, 100);
+        retryCount++;
+        if (retryCount <= 10) { // Only log first 10 retries to avoid spam
+          console.log('🌟 SentimentStars: Data store not ready, retrying...', retryCount);
+        }
+        setTimeout(initializeDataStore, 200); // Increased delay to reduce CPU usage
       }
     };
 
@@ -55,6 +67,7 @@ const SentimentStars = () => {
 
     return () => {
       if (unsubscribe) {
+        console.log('🌟 SentimentStars: Cleaning up subscription');
         unsubscribe();
       }
     };
@@ -85,8 +98,6 @@ const SentimentStars = () => {
     );
   };
 
-  console.log('🌟 SentimentStars: Current data:', sentimentData);
-
   return (
     <Card className="shadow-lg border-0 bg-gradient-to-r from-yellow-50 to-orange-50">
       <CardContent className="p-6">
@@ -104,6 +115,9 @@ const SentimentStars = () => {
             )}
           </div>
           <p className="text-sm text-gray-600 mt-2">Based on sentiment analysis of customer reviews</p>
+          {!isDataStoreReady && (
+            <p className="text-xs text-gray-400 mt-1">Waiting for data...</p>
+          )}
         </div>
       </CardContent>
     </Card>

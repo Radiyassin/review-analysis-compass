@@ -4,6 +4,7 @@ class DataStore {
     constructor() {
         this.data = {};
         this.listeners = new Set();
+        this.isReady = false;
     }
 
     setData(key, value) {
@@ -22,7 +23,11 @@ class DataStore {
 
     subscribe(callback) {
         this.listeners.add(callback);
-        return () => this.listeners.delete(callback);
+        console.log(`DataStore: Added listener, total: ${this.listeners.size}`);
+        return () => {
+            this.listeners.delete(callback);
+            console.log(`DataStore: Removed listener, remaining: ${this.listeners.size}`);
+        };
     }
 
     notifyListeners(key, value) {
@@ -40,8 +45,17 @@ class DataStore {
         this.data = {};
         this.notifyListeners('clear', null);
     }
+
+    markReady() {
+        this.isReady = true;
+        console.log('DataStore: Marked as ready');
+    }
 }
 
 // Create global instance
-window.dataStore = new DataStore();
-console.log('DataStore initialized');
+if (!window.dataStore) {
+    window.dataStore = new DataStore();
+    console.log('DataStore initialized');
+} else {
+    console.log('DataStore already exists');
+}
