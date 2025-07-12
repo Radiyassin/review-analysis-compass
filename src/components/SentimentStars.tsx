@@ -12,6 +12,7 @@ const SentimentStars = () => {
   useEffect(() => {
     // Listen for sentiment data updates from main.js
     const handleSentimentUpdate = (event: CustomEvent) => {
+      console.log('SentimentStars received update:', event.detail);
       const { sentimentScore } = event.detail;
       const clampedScore = Math.max(-1, Math.min(1, sentimentScore));
       const scoreOutOf5 = ((clampedScore + 1) / 2) * 5;
@@ -25,8 +26,9 @@ const SentimentStars = () => {
     window.addEventListener('sentimentDataUpdate', handleSentimentUpdate as EventListener);
     
     // Also check if window has the data already
-    if (typeof window !== 'undefined' && (window as any).currentSentimentScore) {
+    if (typeof window !== 'undefined' && (window as any).currentSentimentScore !== undefined) {
       const sentimentScore = (window as any).currentSentimentScore;
+      console.log('SentimentStars found existing data:', sentimentScore);
       const clampedScore = Math.max(-1, Math.min(1, sentimentScore));
       const scoreOutOf5 = ((clampedScore + 1) / 2) * 5;
       

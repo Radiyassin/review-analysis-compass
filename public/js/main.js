@@ -1,4 +1,3 @@
-
 let sentimentChart, distributionChart, countChart;
 
 window.addEventListener('load', () => {
@@ -49,13 +48,17 @@ async function analyze() {
         }
 
         // Store data globally and dispatch events for React components
-        if (typeof window !== 'undefined') {
-            window.currentSentimentScore = data.sentiment_score;
-            window.currentSalesTrend = data.sales_trend;
-            window.currentProductInfo = data.product_info;
-            window.currentChartData = data.chart_data;
-            window.currentPhrases = data.common_phrases || [];
-        }
+        window.currentSentimentScore = data.sentiment_score;
+        window.currentSalesTrend = data.sales_trend;
+        window.currentProductInfo = data.product_info;
+        window.currentChartData = data.chart_data;
+        window.currentPhrases = data.common_phrases || [];
+
+        console.log('Stored data globally:', {
+            sentimentScore: window.currentSentimentScore,
+            salesTrend: window.currentSalesTrend,
+            productInfo: window.currentProductInfo
+        });
 
         // Dispatch custom events for React components
         setTimeout(() => {
@@ -63,11 +66,13 @@ async function analyze() {
             window.dispatchEvent(new CustomEvent('sentimentDataUpdate', {
                 detail: { sentimentScore: data.sentiment_score }
             }));
+            console.log('Dispatched sentimentDataUpdate event');
 
             // Update sales forecast
             window.dispatchEvent(new CustomEvent('salesTrendUpdate', {
                 detail: data.sales_trend
             }));
+            console.log('Dispatched salesTrendUpdate event');
             
             // Update product info
             updateProductInfo(data.product_info);

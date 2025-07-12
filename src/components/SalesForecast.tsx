@@ -15,6 +15,7 @@ const SalesForecast = () => {
   useEffect(() => {
     // Listen for sales trend updates from main.js
     const handleSalesTrendUpdate = (event: CustomEvent) => {
+      console.log('SalesForecast received update:', event.detail);
       setTrendData(event.detail);
     };
 
@@ -22,6 +23,7 @@ const SalesForecast = () => {
     
     // Also check if window has the data already
     if (typeof window !== 'undefined' && (window as any).currentSalesTrend) {
+      console.log('SalesForecast found existing data:', (window as any).currentSalesTrend);
       setTrendData((window as any).currentSalesTrend);
     }
 
