@@ -23,7 +23,7 @@ const NewChatbot = () => {
   // Listen for analysis completion to update chatbot context
   useEffect(() => {
     const handleAnalysisComplete = (event: CustomEvent) => {
-      console.log('NewChatbot: Analysis completed, updating context');
+      console.log('🤖 NewChatbot: Analysis completed, updating context');
       const data = event.detail;
       chatbotService.setAnalysisData({
         productInfo: data.product_info,
@@ -42,21 +42,38 @@ const NewChatbot = () => {
   }, []);
 
   const handleSendMessage = async () => {
-    if (!inputValue.trim() || isLoading) return;
+    console.log('🤖 CHATBOT: handleSendMessage called');
+    console.log('🤖 Input value:', inputValue);
+    console.log('🤖 Is loading:', isLoading);
+
+    if (!inputValue.trim()) {
+      console.log('🤖 ERROR: Empty input value');
+      return;
+    }
+
+    if (isLoading) {
+      console.log('🤖 ERROR: Already loading');
+      return;
+    }
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       type: 'user',
-      text: inputValue,
+      text: inputValue.trim(),
       timestamp: new Date()
     };
 
+    console.log('🤖 Adding user message:', userMessage);
     setMessages(prev => [...prev, userMessage]);
+    
+    const currentInput = inputValue.trim();
     setInputValue('');
     setIsLoading(true);
 
     try {
-      const response = await chatbotService.processMessage(inputValue);
+      console.log('🤖 Processing message with chatbot service...');
+      const response = await chatbotService.processMessage(currentInput);
+      console.log('🤖 Got response:', response);
       
       const botMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -65,13 +82,14 @@ const NewChatbot = () => {
         timestamp: new Date()
       };
 
+      console.log('🤖 Adding bot message:', botMessage);
       setMessages(prev => [...prev, botMessage]);
     } catch (error) {
-      console.error('Chat error:', error);
+      console.error('🤖 CHAT ERROR:', error);
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         type: 'bot',
-        text: 'Sorry, I encountered an error. Please try again.',
+        text: 'Sorry, I encountered an error processing your message. Please try again.',
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
@@ -81,17 +99,27 @@ const NewChatbot = () => {
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
+    console.log('🤖 Key pressed:', e.key);
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
   };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    console.log('🤖 Input changed:', value);
+    setInputValue(value);
+  };
+
   return (
     <>
       {/* Chat Toggle Button */}
       <Button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          console.log('🤖 Toggle button clicked, isOpen:', !isOpen);
+          setIsOpen(!isOpen);
+        }}
         className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl transition-all duration-300 z-50"
       >
         {isOpen ? (
@@ -157,13 +185,16 @@ const NewChatbot = () => {
             type="text"
             placeholder="Ask about your data..."
             value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
+            onChange={handleInputChange}
             onKeyPress={handleKeyPress}
             disabled={isLoading}
             className="flex-1"
           />
           <Button 
-            onClick={handleSendMessage} 
+            onClick={() => {
+              console.log('🤖 Send button clicked');
+              handleSendMessage();
+            }}
             disabled={isLoading || !inputValue.trim()}
             size="sm" 
             className="bg-blue-600 hover:bg-blue-700"
