@@ -9,7 +9,7 @@ window.addEventListener('load', () => {
 });
 
 async function analyze() {
-    const file = (window as any).selectedCsvFile;
+    const file = window.selectedCsvFile;
     if (!file) {
         alert('Please select a CSV file');
         return;
@@ -50,11 +50,11 @@ async function analyze() {
 
         // Store data globally and dispatch events for React components
         if (typeof window !== 'undefined') {
-            (window as any).currentSentimentScore = data.sentiment_score;
-            (window as any).currentSalesTrend = data.sales_trend;
-            (window as any).currentProductInfo = data.product_info;
-            (window as any).currentChartData = data.chart_data;
-            (window as any).currentPhrases = data.common_phrases || [];
+            window.currentSentimentScore = data.sentiment_score;
+            window.currentSalesTrend = data.sales_trend;
+            window.currentProductInfo = data.product_info;
+            window.currentChartData = data.chart_data;
+            window.currentPhrases = data.common_phrases || [];
         }
 
         // Dispatch custom events for React components

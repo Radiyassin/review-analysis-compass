@@ -39,12 +39,11 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect }) => {
   };
 
   const handleFileSelection = (file: File) => {
+    console.log('File selected:', file.name);
     setSelectedFile(file);
     
     // Store file globally for main.js access
-    if (typeof window !== 'undefined') {
-      (window as any).selectedCsvFile = file;
-    }
+    (window as any).selectedCsvFile = file;
     
     // Call callback if provided
     if (onFileSelect) {
