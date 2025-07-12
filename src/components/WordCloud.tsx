@@ -7,7 +7,7 @@ interface WordCloudData {
 }
 
 const WordCloud = () => {
-  const svgRef = useRef<SVGSVGElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [wordData, setWordData] = useState<WordCloudData[]>([]);
 
   useEffect(() => {
@@ -22,10 +22,18 @@ const WordCloud = () => {
     const initialPhrases = window.dataStore.getData('commonPhrases');
     if (initialPhrases && Array.isArray(initialPhrases)) {
       console.log('☁️ WordCloud: Found initial phrases:', initialPhrases);
-      const formattedData = initialPhrases.map((phrase: any, index: number) => ({
-        text: typeof phrase === 'string' ? phrase : phrase.phrase || phrase.text || `Word ${index}`,
-        value: typeof phrase === 'object' && phrase.count ? phrase.count : Math.random() * 50 + 10
-      }));
+      const formattedData = initialPhrases.slice(0, 20).map((phrase: any, index: number) => {
+        if (Array.isArray(phrase) && phrase.length >= 2) {
+          return {
+            text: String(phrase[0]),
+            value: Number(phrase[1])
+          };
+        }
+        return {
+          text: typeof phrase === 'string' ? phrase : phrase.phrase || phrase.text || `Word ${index}`,
+          value: typeof phrase === 'object' && phrase.count ? phrase.count : Math.random() * 50 + 10
+        };
+      });
       setWordData(formattedData);
     }
 
@@ -33,10 +41,18 @@ const WordCloud = () => {
     const unsubscribe = window.dataStore.subscribe((key: string, value: any) => {
       if (key === 'commonPhrases' && value && Array.isArray(value)) {
         console.log('☁️ WordCloud: Received new phrases:', value);
-        const formattedData = value.map((phrase: any, index: number) => ({
-          text: typeof phrase === 'string' ? phrase : phrase.phrase || phrase.text || `Word ${index}`,
-          value: typeof phrase === 'object' && phrase.count ? phrase.count : Math.random() * 50 + 10
-        }));
+        const formattedData = value.slice(0, 20).map((phrase: any, index: number) => {
+          if (Array.isArray(phrase) && phrase.length >= 2) {
+            return {
+              text: String(phrase[0]),
+              value: Number(phrase[1])
+            };
+          }
+          return {
+            text: typeof phrase === 'string' ? phrase : phrase.phrase || phrase.text || `Word ${index}`,
+            value: typeof phrase === 'object' && phrase.count ? phrase.count : Math.random() * 50 + 10
+          };
+        });
         setWordData(formattedData);
       }
     });
@@ -47,79 +63,55 @@ const WordCloud = () => {
   }, []);
 
   useEffect(() => {
-    if (!wordData.length || !svgRef.current) return;
+    if (!wordData.length || !containerRef.current) return;
 
     console.log('☁️ WordCloud: Rendering word cloud with data:', wordData);
     
-    const svg = svgRef.current;
-    const container = svg.parentElement;
-    if (!container) return;
-
-    const width = container.clientWidth;
-    const height = 384; // h-96 equivalent
+    const container = containerRef.current;
     
     // Clear previous content
-    svg.innerHTML = '';
-    svg.setAttribute('width', width.toString());
-    svg.setAttribute('height', height.toString());
-
-    // Simple word cloud layout
-    const centerX = width / 2;
-    const centerY = height / 2;
-    const maxFontSize = 32;
-    const minFontSize = 12;
+    container.innerHTML = '';
     
-    // Sort by value to place larger words first
-    const sortedWords = [...wordData].sort((a, b) => b.value - a.value);
+    // Create words as divs with absolute positioning
+    const colors = ['text-blue-600', 'text-green-600', 'text-purple-600', 'text-red-600', 'text-yellow-600', 'text-pink-600'];
     
-    sortedWords.forEach((word, index) => {
-      const fontSize = Math.max(minFontSize, maxFontSize - (index * 2));
-      const angle = (Math.random() - 0.5) * 60; // Random angle between -30 and 30 degrees
+    wordData.forEach((word, index) => {
+      const wordElement = document.createElement('div');
+      wordElement.textContent = word.text;
+      wordElement.className = `absolute cursor-pointer transition-all duration-300 hover:scale-110 font-medium ${colors[index % colors.length]}`;
       
-      // Create text element
-      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      text.textContent = word.text;
-      text.setAttribute('font-size', fontSize.toString());
-      text.setAttribute('font-weight', index < 3 ? 'bold' : 'normal');
-      text.setAttribute('text-anchor', 'middle');
-      text.setAttribute('dominant-baseline', 'middle');
-      text.setAttribute('transform', `rotate(${angle})`);
-      
-      // Color based on importance
-      const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4'];
-      text.setAttribute('fill', colors[index % colors.length]);
+      // Calculate font size based on value
+      const fontSize = Math.max(12, Math.min(32, word.value * 2));
+      wordElement.style.fontSize = `${fontSize}px`;
       
       // Position in a spiral pattern
-      const spiralAngle = index * 0.5;
-      const spiralRadius = Math.sqrt(index) * 20;
-      const x = centerX + Math.cos(spiralAngle) * spiralRadius;
-      const y = centerY + Math.sin(spiralAngle) * spiralRadius;
+      const angle = index * 0.8;
+      const radius = Math.sqrt(index) * 25;
+      const centerX = 50; // percentage
+      const centerY = 50; // percentage
       
-      text.setAttribute('x', x.toString());
-      text.setAttribute('y', y.toString());
+      const x = centerX + Math.cos(angle) * (radius / 10);
+      const y = centerY + Math.sin(angle) * (radius / 10);
       
-      // Add hover effect
-      text.style.cursor = 'pointer';
-      text.style.transition = 'all 0.3s ease';
-      text.addEventListener('mouseenter', () => {
-        text.style.opacity = '0.7';
-        text.style.transform = `scale(1.1) rotate(${angle}deg)`;
-      });
-      text.addEventListener('mouseleave', () => {
-        text.style.opacity = '1';
-        text.style.transform = `scale(1) rotate(${angle}deg)`;
-      });
+      wordElement.style.left = `${Math.max(5, Math.min(85, x))}%`;
+      wordElement.style.top = `${Math.max(10, Math.min(80, y))}%`;
+      wordElement.style.transform = 'translate(-50%, -50%)';
       
-      svg.appendChild(text);
+      // Random rotation
+      const rotation = (Math.random() - 0.5) * 30;
+      wordElement.style.transform += ` rotate(${rotation}deg)`;
+      
+      container.appendChild(wordElement);
     });
   }, [wordData]);
 
   return (
-    <div className="w-full h-96 border border-gray-200 rounded-lg bg-white flex items-center justify-center overflow-hidden">
-      {wordData.length > 0 ? (
-        <svg ref={svgRef} className="w-full h-full" />
-      ) : (
-        <p className="text-gray-500">Word cloud will appear here after analysis</p>
+    <div 
+      ref={containerRef}
+      className="w-full h-96 border border-gray-200 rounded-lg bg-white relative overflow-hidden flex items-center justify-center"
+    >
+      {wordData.length === 0 && (
+        <p className="text-gray-500 absolute">Word cloud will appear here after analysis</p>
       )}
     </div>
   );

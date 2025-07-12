@@ -2,6 +2,8 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 const DownloadReport = () => {
   const handleDownload = async () => {
@@ -22,87 +24,68 @@ const DownloadReport = () => {
         return;
       }
 
-      // Create a simple text-based report
-      const reportContent = generateReportContent(allData);
+      // Show loading state
+      const button = document.querySelector('button') as HTMLButtonElement;
+      const originalText = button?.textContent;
+      if (button) {
+        button.textContent = 'Generating PDF...';
+        button.disabled = true;
+      }
+
+      // Take screenshot of the entire page
+      const canvas = await html2canvas(document.body, {
+        height: document.body.scrollHeight,
+        width: document.body.scrollWidth,
+        useCORS: true,
+        scale: 0.5, // Reduce scale for better performance
+        scrollX: 0,
+        scrollY: 0
+      });
+
+      // Create PDF
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 210; // A4 width in mm
+      const pageHeight = 295; // A4 height in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+
+      let position = 0;
+
+      // Add the image to PDF
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      // Add new pages if content is longer than one page
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      // Download the PDF
+      const fileName = `sentiment-analysis-report-${new Date().toISOString().split('T')[0]}.pdf`;
+      pdf.save(fileName);
       
-      // Create and download as text file (since we don't have PDF library)
-      const blob = new Blob([reportContent], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `sentiment-analysis-report-${new Date().toISOString().split('T')[0]}.txt`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      console.log('📄 DownloadReport: PDF downloaded successfully');
       
-      console.log('📄 DownloadReport: Report downloaded successfully');
+      // Reset button state
+      if (button && originalText) {
+        button.textContent = originalText;
+        button.disabled = false;
+      }
+      
     } catch (error) {
-      console.error('📄 DownloadReport: Error generating report:', error);
-      alert('Failed to generate report. Please try again.');
+      console.error('📄 DownloadReport: Error generating PDF:', error);
+      alert('Failed to generate PDF. Please try again.');
+      
+      // Reset button state on error
+      const button = document.querySelector('button') as HTMLButtonElement;
+      if (button) {
+        button.textContent = 'Download Product Report (PDF)';
+        button.disabled = false;
+      }
     }
-  };
-
-  const generateReportContent = (data: any) => {
-    const currentDate = new Date().toLocaleDateString();
-    
-    return `
-SENTIMENT ANALYSIS REPORT
-Generated on: ${currentDate}
-
-===============================
-PRODUCT INFORMATION
-===============================
-Product Name: ${data.productInfo?.['Product Name'] || 'N/A'}
-Brand Name: ${data.productInfo?.['Brand Name'] || 'N/A'}
-Price: ${data.productInfo?.['Price'] || 'N/A'}
-
-===============================
-SENTIMENT ANALYSIS RESULTS
-===============================
-Overall Sentiment Score: ${data.sentimentScore || 'N/A'}/5
-
-Sales Trend: ${data.salesTrend?.trend || 'N/A'}
-Average Sentiment: ${data.salesTrend?.avg_sentiment || 'N/A'}
-Trend Message: ${data.salesTrend?.message || 'N/A'}
-
-===============================
-CHART DATA SUMMARY
-===============================
-${data.chartData?.sentiment ? `
-Sentiment Scores:
-- Positive: ${data.chartData.sentiment.means?.[0]?.toFixed(2) || 'N/A'}
-- Negative: ${data.chartData.sentiment.means?.[1]?.toFixed(2) || 'N/A'}
-` : ''}
-
-${data.chartData?.distribution ? `
-Review Distribution:
-- Positive: ${data.chartData.distribution.values?.[0] || 0}
-- Neutral: ${data.chartData.distribution.values?.[1] || 0}
-- Negative: ${data.chartData.distribution.values?.[2] || 0}
-` : ''}
-
-${data.chartData?.counts ? `
-Review Counts:
-- Positive Reviews: ${data.chartData.counts.values?.[0] || 0}
-- Negative Reviews: ${data.chartData.counts.values?.[1] || 0}
-` : ''}
-
-===============================
-COMMON PHRASES
-===============================
-${data.commonPhrases && Array.isArray(data.commonPhrases) ? 
-  data.commonPhrases.map((phrase: any, index: number) => 
-    `${index + 1}. ${typeof phrase === 'string' ? phrase : phrase.phrase || phrase.text || 'N/A'}`
-  ).join('\n') : 'No common phrases available'}
-
-===============================
-REPORT END
-===============================
-
-This report was generated by the Sentiment Analysis Dashboard.
-For more detailed analysis, please use the interactive dashboard.
-    `.trim();
   };
 
   return (
@@ -112,7 +95,7 @@ For more detailed analysis, please use the interactive dashboard.
         className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-3 rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
       >
         <Download className="h-5 w-5 mr-2" />
-        Download Product Report (TXT)
+        Download Product Report (PDF)
       </Button>
     </div>
   );
