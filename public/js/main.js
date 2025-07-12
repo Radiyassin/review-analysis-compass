@@ -2,7 +2,7 @@
 let sentimentChart, distributionChart, countChart;
 
 window.addEventListener('load', () => {
-    console.info('main.js loaded successfully');
+    console.log('main.js loaded successfully');
     
     // Initialize charts when the page loads
     setTimeout(() => {
@@ -20,8 +20,15 @@ window.analyze = async function() {
         return;
     }
 
-    console.log('Selected file:', selectedFile.name);
+    console.log('Selected file:', selectedFile.name, 'Size:', selectedFile.size);
     
+    // Show loading state
+    const analyzeBtn = document.querySelector('.btn-blue');
+    if (analyzeBtn) {
+        analyzeBtn.disabled = true;
+        analyzeBtn.innerHTML = '<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>Analyzing...';
+    }
+
     const formData = new FormData();
     formData.append('file', selectedFile);
 
@@ -33,17 +40,17 @@ window.analyze = async function() {
         });
 
         console.log('Response status:', response.status);
+        console.log('Response headers:', response.headers);
         
         if (!response.ok) {
-            const errorData = await response.json();
-            console.error('API Error:', errorData);
-            alert(`Error: ${errorData.error || 'Upload failed'}`);
-            return;
+            const errorText = await response.text();
+            console.error('Server Error Response:', errorText);
+            throw new Error(`Server error: ${response.status} - ${errorText}`);
         }
 
         const data = await response.json();
         console.log('=== RECEIVED DATA FROM BACKEND ===');
-        console.log('Full response:', data);
+        console.log('Full response:', JSON.stringify(data, null, 2));
 
         if (!data.success && !data.chart_data) {
             console.error('Invalid response format:', data);
@@ -62,46 +69,49 @@ window.analyze = async function() {
         console.log('Sentiment Score:', window.currentSentimentScore);
         console.log('Sales Trend:', window.currentSalesTrend);
         console.log('Product Info:', window.currentProductInfo);
+        console.log('Chart Data:', window.currentChartData);
 
-        // Dispatch events for React components with a small delay
+        // Update UI components immediately
+        updateProductInfo(data.product_info || {});
+        updatePhrases(data.common_phrases || []);
+        
+        if (data.chart_data) {
+            updateCharts(data.chart_data);
+        }
+
+        // Dispatch events for React components
         setTimeout(() => {
             console.log('=== DISPATCHING EVENTS TO REACT ===');
             
             // Update sentiment stars component
-            window.dispatchEvent(new CustomEvent('sentimentDataUpdate', {
+            const sentimentEvent = new CustomEvent('sentimentDataUpdate', {
                 detail: { sentimentScore: data.sentiment_score || 0 }
-            }));
-            console.log('Dispatched sentimentDataUpdate event');
+            });
+            window.dispatchEvent(sentimentEvent);
+            console.log('Dispatched sentimentDataUpdate event with score:', data.sentiment_score);
 
             // Update sales forecast component
-            window.dispatchEvent(new CustomEvent('salesTrendUpdate', {
+            const salesEvent = new CustomEvent('salesTrendUpdate', {
                 detail: data.sales_trend || { trend: 'Stable', avg_sentiment: 0, message: 'No data' }
-            }));
-            console.log('Dispatched salesTrendUpdate event');
-            
-            // Update product info
-            if (data.product_info) {
-                updateProductInfo(data.product_info);
-            }
-            
-            // Update charts
-            if (data.chart_data) {
-                updateCharts(data.chart_data);
-            }
-            
-            // Update phrases
-            if (data.common_phrases) {
-                updatePhrases(data.common_phrases);
-            }
+            });
+            window.dispatchEvent(salesEvent);
+            console.log('Dispatched salesTrendUpdate event with trend:', data.sales_trend);
             
         }, 100);
 
+        alert('Analysis completed successfully! Check the results below.');
         console.log('=== ANALYSIS COMPLETED ===');
         
     } catch (error) {
         console.error('=== FETCH ERROR ===');
         console.error('Error details:', error);
-        alert(`Network error: ${error.message}`);
+        alert(`Analysis failed: ${error.message}`);
+    } finally {
+        // Reset button state
+        if (analyzeBtn) {
+            analyzeBtn.disabled = false;
+            analyzeBtn.innerHTML = '<svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>Analyze CSV';
+        }
     }
 };
 
@@ -115,6 +125,8 @@ function updateProductInfo(productInfo) {
     if (productNameEl) productNameEl.textContent = productInfo['Product Name'] || 'N/A';
     if (brandNameEl) brandNameEl.textContent = productInfo['Brand Name'] || 'N/A';
     if (priceEl) priceEl.textContent = productInfo['Price'] || 'N/A';
+    
+    console.log('Product info updated in DOM');
 }
 
 function updatePhrases(phrases) {
@@ -125,6 +137,7 @@ function updatePhrases(phrases) {
             .slice(0, 10)
             .map(([phrase, count]) => `<li class="text-gray-700">${phrase} (${count})</li>`)
             .join('');
+        console.log('Phrases updated in DOM');
     }
 }
 
@@ -142,62 +155,77 @@ function initializeCharts() {
     
     // Initialize empty charts
     if (typeof Chart !== 'undefined') {
-        sentimentChart = new Chart(ctx1, {
-            type: 'bar',
-            data: {
-                labels: ['Positive', 'Negative'],
-                datasets: [{
-                    label: 'Sentiment Scores',
-                    data: [0, 0],
-                    backgroundColor: ['#10B981', '#EF4444']
-                }]
-            },
-            options: { responsive: true, plugins: { legend: { display: false } } }
-        });
+        try {
+            sentimentChart = new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: ['Positive', 'Negative'],
+                    datasets: [{
+                        label: 'Sentiment Scores',
+                        data: [0, 0],
+                        backgroundColor: ['#10B981', '#EF4444']
+                    }]
+                },
+                options: { responsive: true, plugins: { legend: { display: false } } }
+            });
 
-        distributionChart = new Chart(ctx2, {
-            type: 'doughnut',
-            data: {
-                labels: ['Positive', 'Neutral', 'Negative'],
-                datasets: [{
-                    data: [0, 0, 0],
-                    backgroundColor: ['#10B981', '#6B7280', '#EF4444']
-                }]
-            },
-            options: { responsive: true }
-        });
+            distributionChart = new Chart(ctx2, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Positive', 'Neutral', 'Negative'],
+                    datasets: [{
+                        data: [0, 0, 0],
+                        backgroundColor: ['#10B981', '#6B7280', '#EF4444']
+                    }]
+                },
+                options: { responsive: true }
+            });
 
-        countChart = new Chart(ctx3, {
-            type: 'bar',
-            data: {
-                labels: ['Total Reviews'],
-                datasets: [{
-                    label: 'Count',
-                    data: [0],
-                    backgroundColor: ['#3B82F6']
-                }]
-            },
-            options: { responsive: true, plugins: { legend: { display: false } } }
-        });
+            countChart = new Chart(ctx3, {
+                type: 'bar',
+                data: {
+                    labels: ['Total Reviews'],
+                    datasets: [{
+                        label: 'Count',
+                        data: [0],
+                        backgroundColor: ['#3B82F6']
+                    }]
+                },
+                options: { responsive: true, plugins: { legend: { display: false } } }
+            });
+            
+            console.log('Charts initialized successfully');
+        } catch (error) {
+            console.error('Error initializing charts:', error);
+        }
+    } else {
+        console.error('Chart.js not loaded');
     }
 }
 
 function updateCharts(chartData) {
     console.log('Updating charts with data:', chartData);
     
-    if (sentimentChart && chartData.sentiment) {
-        sentimentChart.data.datasets[0].data = chartData.sentiment.means || [0, 0];
-        sentimentChart.update();
-    }
-    
-    if (distributionChart && chartData.distribution) {
-        distributionChart.data.datasets[0].data = chartData.distribution.values || [0, 0, 0];
-        distributionChart.update();
-    }
-    
-    if (countChart && chartData.counts) {
-        countChart.data.datasets[0].data = chartData.counts.values || [0];
-        countChart.update();
+    try {
+        if (sentimentChart && chartData.sentiment) {
+            sentimentChart.data.datasets[0].data = chartData.sentiment.means || [0, 0];
+            sentimentChart.update();
+            console.log('Sentiment chart updated');
+        }
+        
+        if (distributionChart && chartData.distribution) {
+            distributionChart.data.datasets[0].data = chartData.distribution.values || [0, 0, 0];
+            distributionChart.update();
+            console.log('Distribution chart updated');
+        }
+        
+        if (countChart && chartData.counts) {
+            countChart.data.datasets[0].data = chartData.counts.values || [0];
+            countChart.update();
+            console.log('Count chart updated');
+        }
+    } catch (error) {
+        console.error('Error updating charts:', error);
     }
 }
 

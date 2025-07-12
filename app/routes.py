@@ -10,6 +10,7 @@ import os
 from flask import session
 import openai
 from flask import current_app
+import traceback
 
 main_bp = Blueprint('main', __name__)
 
@@ -31,178 +32,260 @@ def serve_static(path):
 @main_bp.route('/api/upload', methods=['POST'])
 def upload_file():
     try:
-        print("=== UPLOAD ENDPOINT CALLED ===")
+        print("\n" + "="*50)
+        print("UPLOAD ENDPOINT CALLED")
+        print("="*50)
         
+        # Check if file is in request
         if 'file' not in request.files:
-            print("ERROR: No file in request")
-            return jsonify({"error": "No file uploaded"}), 400
+            print("ERROR: No file in request.files")
+            print("Available keys:", list(request.files.keys()))
+            return jsonify({"error": "No file uploaded", "success": False}), 400
 
         file = request.files['file']
-        if file.filename == '':
-            print("ERROR: Empty filename")
-            return jsonify({"error": "No selected file"}), 400
+        if not file or file.filename == '':
+            print("ERROR: Empty filename or no file")
+            return jsonify({"error": "No selected file", "success": False}), 400
 
         print(f"Processing file: {file.filename}")
+        print(f"File size: {file.content_length if hasattr(file, 'content_length') else 'Unknown'}")
 
         # Ensure uploads directory exists
-        os.makedirs('uploads', exist_ok=True)
+        uploads_dir = 'uploads'
+        if not os.path.exists(uploads_dir):
+            os.makedirs(uploads_dir)
+            print(f"Created uploads directory: {uploads_dir}")
+
+        # Save file with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        file_path = f"uploads/{timestamp}_{file.filename}"
+        filename = f"{timestamp}_{file.filename}"
+        file_path = os.path.join(uploads_dir, filename)
+        
+        print(f"Saving file to: {file_path}")
         file.save(file_path)
-        print(f"File saved to: {file_path}")
+        
+        if not os.path.exists(file_path):
+            print("ERROR: File was not saved properly")
+            return jsonify({"error": "Failed to save file", "success": False}), 500
+            
+        print(f"File saved successfully. Size: {os.path.getsize(file_path)} bytes")
 
-        # Read CSV file
+        # Read and validate CSV
         try:
-            df = pd.read_csv(file_path)
-            print(f"CSV loaded successfully with {len(df)} rows and columns: {list(df.columns)}")
+            print("Reading CSV file...")
+            df = pd.read_csv(file_path, encoding='utf-8')
+            print(f"CSV loaded: {len(df)} rows, {len(df.columns)} columns")
+            print(f"Columns: {list(df.columns)}")
+            print(f"First few rows preview:")
+            print(df.head().to_string())
+            
+        except UnicodeDecodeError:
+            try:
+                print("UTF-8 failed, trying latin-1 encoding...")
+                df = pd.read_csv(file_path, encoding='latin-1')
+                print(f"CSV loaded with latin-1: {len(df)} rows, {len(df.columns)} columns")
+            except Exception as e:
+                print(f"ERROR reading CSV with latin-1: {str(e)}")
+                return jsonify({"error": f"Failed to read CSV file: {str(e)}", "success": False}), 400
         except Exception as e:
-            print(f"Error reading CSV: {str(e)}")
-            return jsonify({"error": f"Failed to read CSV: {str(e)}"}), 400
+            print(f"ERROR reading CSV: {str(e)}")
+            return jsonify({"error": f"Failed to read CSV: {str(e)}", "success": False}), 400
 
-        # Check required columns
+        # Check for required columns
         required_columns = ['Reviews']
         missing_cols = [col for col in required_columns if col not in df.columns]
+        
         if missing_cols:
-            print(f"Missing columns: {missing_cols}")
-            return jsonify({
-                "error": f"Missing required columns: {', '.join(missing_cols)}",
-                "available_columns": list(df.columns)
-            }), 400
+            print(f"Missing required columns: {missing_cols}")
+            print(f"Available columns: {list(df.columns)}")
+            # Try to find similar column names
+            potential_review_cols = [col for col in df.columns if 'review' in col.lower() or 'comment' in col.lower() or 'feedback' in col.lower()]
+            if potential_review_cols:
+                print(f"Potential review columns found: {potential_review_cols}")
+                return jsonify({
+                    "error": f"Missing 'Reviews' column. Found potential columns: {', '.join(potential_review_cols)}",
+                    "available_columns": list(df.columns),
+                    "success": False
+                }), 400
+            else:
+                return jsonify({
+                    "error": f"Missing required 'Reviews' column",
+                    "available_columns": list(df.columns),
+                    "success": False
+                }), 400
 
-        # Clean data
+        # Clean the data
+        print("Cleaning data...")
         original_count = len(df)
+        
+        # Handle missing values in Reviews column
         df = df.dropna(subset=['Reviews'])
-        df = df[df['Reviews'].str.strip() != '']  # Remove empty reviews
-        print(f"After cleaning: {len(df)} rows remaining (from {original_count})")
+        df = df[df['Reviews'].astype(str).str.strip() != '']
+        df = df[df['Reviews'].astype(str) != 'nan']
+        
+        cleaned_count = len(df)
+        print(f"Data cleaned: {cleaned_count} rows remaining (from {original_count})")
 
-        if len(df) == 0:
-            return jsonify({"error": "No valid reviews found in the file"}), 400
+        if cleaned_count == 0:
+            return jsonify({"error": "No valid reviews found after cleaning", "success": False}), 400
 
-        # Analyze sentiment
-        from app.utils.nlp_processor import analyze_sentiment, extract_common_phrases
+        # Perform sentiment analysis
         print("Starting sentiment analysis...")
+        from app.utils.nlp_processor import analyze_sentiment
+        
         df = analyze_sentiment(df, 'Reviews')
         print("Sentiment analysis completed")
+        print(df['sentiment'].value_counts().to_dict())
 
-        # Extract product info safely
-        product_info = {
-            "Product Name": str(df['Product Name'].iloc[0]) if 'Product Name' in df.columns and len(df) > 0 and pd.notna(df['Product Name'].iloc[0]) else 'Unknown Product',
-            "Brand Name": str(df['Brand Name'].iloc[0]) if 'Brand Name' in df.columns and len(df) > 0 and pd.notna(df['Brand Name'].iloc[0]) else 'Unknown Brand',
-            "Price": f"${float(df['Price'].iloc[0]):.2f}" if 'Price' in df.columns and len(df) > 0 and pd.notna(df['Price'].iloc[0]) else 'N/A'
-        }
-        print(f"Product info extracted: {product_info}")
+        # Extract product information
+        print("Extracting product information...")
+        product_info = {}
+        
+        # Try to get product info from first row
+        for col_name in ['Product Name', 'ProductName', 'product_name', 'Product', 'Name']:
+            if col_name in df.columns and len(df) > 0:
+                val = df[col_name].iloc[0]
+                if pd.notna(val) and str(val).strip():
+                    product_info['Product Name'] = str(val).strip()
+                    break
+        
+        for col_name in ['Brand Name', 'BrandName', 'brand_name', 'Brand', 'Manufacturer']:
+            if col_name in df.columns and len(df) > 0:
+                val = df[col_name].iloc[0]
+                if pd.notna(val) and str(val).strip():
+                    product_info['Brand Name'] = str(val).strip()
+                    break
+        
+        for col_name in ['Price', 'price', 'Cost', 'cost']:
+            if col_name in df.columns and len(df) > 0:
+                val = df[col_name].iloc[0]
+                if pd.notna(val):
+                    try:
+                        price_val = float(str(val).replace('$', '').replace(',', ''))
+                        product_info['Price'] = f"${price_val:.2f}"
+                    except:
+                        product_info['Price'] = str(val)
+                    break
 
-        # Count complaints by category
-        def count_complaints_by_category(reviews):
-            categories = {
-                "screen": ["screen", "display", "touch", "brightness"],
-                "battery": ["battery", "charge", "charging", "power"],
-                "camera": ["camera", "photo", "picture", "lens"],
-                "performance": ["slow", "lag", "crash", "freeze", "performance"],
-                "build": ["build", "material", "quality", "durability", "scratch"]
-            }
-            complaint_counts = {key: 0 for key in categories}
-            for review in reviews:
-                review_lower = str(review).lower()
-                for category, keywords in categories.items():
-                    if any(kw in review_lower for kw in keywords):
-                        complaint_counts[category] += 1
-            return complaint_counts
-
-        negative_reviews = df[df['sentiment'] == 'negative']['Reviews']
-        complaint_summary = count_complaints_by_category(negative_reviews)
-        print(f"Complaint summary: {complaint_summary}")
+        # Set defaults if not found
+        if 'Product Name' not in product_info:
+            product_info['Product Name'] = 'Unknown Product'
+        if 'Brand Name' not in product_info:
+            product_info['Brand Name'] = 'Unknown Brand'  
+        if 'Price' not in product_info:
+            product_info['Price'] = 'N/A'
+            
+        print(f"Product info: {product_info}")
 
         # Calculate sentiment statistics
-        positive_df = df[df['sentiment'] == 'positive']
-        negative_df = df[df['sentiment'] == 'negative']
-        neutral_df = df[df['sentiment'] == 'neutral']
-
-        pos_count = len(positive_df)
-        neg_count = len(negative_df)
-        neu_count = len(neutral_df)
-
-        pos_sentiment_mean = float(positive_df['sentiment_score'].mean()) if pos_count > 0 else 0
-        neg_sentiment_mean = float(negative_df['sentiment_score'].mean()) if neg_count > 0 else 0
+        print("Calculating sentiment statistics...")
+        sentiment_counts = df['sentiment'].value_counts()
+        pos_count = sentiment_counts.get('positive', 0)
+        neg_count = sentiment_counts.get('negative', 0)
+        neu_count = sentiment_counts.get('neutral', 0)
+        
+        # Calculate mean sentiment scores by category
+        pos_mean = float(df[df['sentiment'] == 'positive']['sentiment_score'].mean()) if pos_count > 0 else 0
+        neg_mean = float(df[df['sentiment'] == 'negative']['sentiment_score'].mean()) if neg_count > 0 else 0
+        
+        # Overall sentiment score
         overall_sentiment = float(df['sentiment_score'].mean())
+        
+        print(f"Sentiment stats: Pos={pos_count}, Neg={neg_count}, Neu={neu_count}")
+        print(f"Sentiment means: Pos={pos_mean:.3f}, Neg={neg_mean:.3f}, Overall={overall_sentiment:.3f}")
 
-        print(f"Sentiment stats - Positive: {pos_count}, Negative: {neg_count}, Neutral: {neu_count}")
-        print(f"Overall sentiment score: {overall_sentiment}")
+        # Extract common phrases
+        print("Extracting common phrases...")
+        try:
+            common_phrases = extract_common_phrases(df['Reviews'].tolist())
+            negative_reviews = df[df['sentiment'] == 'negative']['Reviews'].tolist()
+            negative_phrases = extract_common_phrases(negative_reviews) if negative_reviews else []
+            print(f"Common phrases extracted: {len(common_phrases)} total, {len(negative_phrases)} negative")
+        except Exception as e:
+            print(f"Error extracting phrases: {str(e)}")
+            common_phrases = []
+            negative_phrases = []
 
         # Prepare chart data
-        response_data = {
-            "success": True,
-            "chart_data": {
-                "sentiment": {
-                    "labels": ["Positive", "Negative"],
-                    "means": [pos_sentiment_mean, neg_sentiment_mean]
-                },
-                "distribution": {
-                    "labels": ["Positive", "Neutral", "Negative"],
-                    "values": [pos_count, neu_count, neg_count]
-                },
-                "counts": {
-                    "labels": ["Total Reviews"],
-                    "values": [int(len(df))]
-                }
+        chart_data = {
+            "sentiment": {
+                "labels": ["Positive", "Negative"],
+                "means": [pos_mean, abs(neg_mean)]  # Make negative mean positive for display
             },
-            "product_info": product_info,
-            "common_phrases": extract_common_phrases(df['Reviews']),
-            "negative_phrases": extract_common_phrases(negative_reviews),
-            "complaint_categories": complaint_summary,
-            "sentiment_score": overall_sentiment
+            "distribution": {
+                "labels": ["Positive", "Neutral", "Negative"],
+                "values": [int(pos_count), int(neu_count), int(neg_count)]
+            },
+            "counts": {
+                "labels": ["Total Reviews"],
+                "values": [int(len(df))]
+            }
         }
 
-        # Handle ratings if available
-        if 'Rating' in df.columns:
-            try:
-                df['Rating'] = pd.to_numeric(df['Rating'], errors='coerce')
-                df_with_ratings = df.dropna(subset=['Rating'])
-
-                if len(df_with_ratings) > 0:
-                    avg_rating = float(df_with_ratings['Rating'].mean())
-                    response_data["rating_stats"] = {
-                        "average_rating": avg_rating,
-                        "rating_distribution": {
-                            str(i): int(df_with_ratings['Rating'].value_counts().get(i, 0)) 
-                            for i in range(1, 6)
-                        },
-                        "sentiment_mean": overall_sentiment,
-                        "comparison_score": float((avg_rating/5) - overall_sentiment)
-                    }
-                    print(f"Rating stats added: avg={avg_rating}")
-            except Exception as e:
-                print(f"Error processing ratings: {str(e)}")
-
-        # Add predicted sales trend based on sentiment
+        # Determine sales trend
         if overall_sentiment > 0.05:
             trend = 'Up'
+            message = "Customers are mostly satisfied, so the product is likely to sell well."
         elif overall_sentiment < -0.05:
-            trend = 'Down'
+            trend = 'Down' 
+            message = "Many customers are unhappy, which may reduce future sales."
         else:
             trend = 'Stable'
+            message = "Customer opinions are mixed, so sales are expected to stay the same."
 
-        response_data["sales_trend"] = {
+        sales_trend = {
             "avg_sentiment": round(overall_sentiment, 3),
             "trend": trend,
-            "message": f"Predicted sales trend is {trend.lower()} based on sentiment analysis."
+            "message": message
         }
+
+        # Build response
+        response_data = {
+            "success": True,
+            "chart_data": chart_data,
+            "product_info": product_info,
+            "common_phrases": common_phrases,
+            "negative_phrases": negative_phrases,
+            "sentiment_score": overall_sentiment,
+            "sales_trend": sales_trend,
+            "stats": {
+                "total_reviews": int(len(df)),
+                "positive_reviews": int(pos_count),
+                "negative_reviews": int(neg_count),
+                "neutral_reviews": int(neu_count)
+            }
+        }
+
+        # Store context for chatbot
+        try:
+            reviews_sample = " ".join(df['Reviews'].astype(str).head(50).tolist())[:2000]
+            session['reviews_text'] = reviews_sample
+            session['product_info'] = product_info
+            print("Context stored for chatbot")
+        except Exception as e:
+            print(f"Warning: Could not store context for chatbot: {str(e)}")
+
+        print("="*50)
+        print("ANALYSIS COMPLETED SUCCESSFULLY")
+        print(f"Response keys: {list(response_data.keys())}")
+        print("="*50)
         
-        # Store context for chat
-        reviews_text = " ".join(df['Reviews'].astype(str).tolist())[:3000]
-        session['reviews_text'] = reviews_text
-        
-        print("=== ANALYSIS COMPLETED SUCCESSFULLY ===")
-        print(f"Response data keys: {list(response_data.keys())}")
         return jsonify(response_data)
 
     except Exception as e:
-        print(f"=== SERVER ERROR in upload_file ===")
+        print(f"\n{'='*50}")
+        print("CRITICAL ERROR IN UPLOAD ENDPOINT")
+        print(f"{'='*50}")
         print(f"Error: {str(e)}")
-        import traceback
+        print("Full traceback:")
         traceback.print_exc()
-        return jsonify({"error": f"Internal server error: {str(e)}"}), 500
-    
+        print(f"{'='*50}")
+        
+        return jsonify({
+            "error": f"Internal server error: {str(e)}",
+            "success": False
+        }), 500
+
 @main_bp.route('/api/chat', methods=['POST'])
 def chat():
     try:
@@ -213,30 +296,38 @@ def chat():
 
         question = request.json.get('question', '')
         context = session.get('reviews_text', '')
+        product_info = session.get('product_info', {})
 
         if not context:
-            return jsonify({'answer': "Please upload a product review file first."})
+            return jsonify({'answer': "Please upload a product review file first to enable chat functionality."})
 
-        prompt = f"""You are a helpful assistant that answers questions based on product reviews. 
+        prompt = f"""You are a helpful assistant analyzing customer reviews for this product:
+Product: {product_info.get('Product Name', 'Unknown')}
+Brand: {product_info.get('Brand Name', 'Unknown')}
+Price: {product_info.get('Price', 'Unknown')}
+
 Here are some customer reviews:
 ---
 {context}
 ---
-Now answer this question: {question}
-"""
+
+Question: {question}
+
+Please provide a helpful answer based on the reviews and product information."""
 
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are a helpful product assistant."},
+                {"role": "system", "content": "You are a helpful product review analyst."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=150,
+            max_tokens=200,
             temperature=0.7
         )
+        
         answer = response.choices[0].message.content
-
         return jsonify({'answer': answer})
+        
     except Exception as e:
-        print(f"OpenAI error: {e}")
-        return jsonify({'answer': f"Error: {str(e)}"})
+        print(f"Chat error: {str(e)}")
+        return jsonify({'answer': f"Sorry, there was an error processing your question: {str(e)}"})

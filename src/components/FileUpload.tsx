@@ -39,11 +39,25 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect }) => {
   };
 
   const handleFileSelection = (file: File) => {
-    console.log('File selected:', file.name);
+    console.log('FileUpload: File selected:', file.name, 'Size:', file.size);
+    
+    // Validate file type
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      alert('Please select a CSV file');
+      return;
+    }
+    
+    // Validate file size (10MB limit)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('File size must be less than 10MB');
+      return;
+    }
+    
     setSelectedFile(file);
     
-    // Store file globally for main.js access
+    // Store file globally for main.js access - this is crucial!
     (window as any).selectedCsvFile = file;
+    console.log('FileUpload: File stored globally as window.selectedCsvFile');
     
     // Call callback if provided
     if (onFileSelect) {
@@ -82,6 +96,9 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect }) => {
                 <p className="text-sm text-gray-600 mt-2">
                   {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
                 </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Click "Analyze CSV" button to start analysis
+                </p>
               </div>
             </>
           ) : (
@@ -93,6 +110,9 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect }) => {
                 </span>
                 <p className="text-sm text-gray-500 mt-2">
                   Supports CSV files up to 10MB
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  File must contain a 'Reviews' column
                 </p>
               </div>
             </>
