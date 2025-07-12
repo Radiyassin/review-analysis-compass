@@ -11,7 +11,6 @@ interface SalesTrendData {
 
 const SalesForecast = () => {
   const [trendData, setTrendData] = useState<SalesTrendData | null>(null);
-  const [isDataStoreReady, setIsDataStoreReady] = useState(false);
 
   useEffect(() => {
     console.log('📈 SalesForecast component mounted');
@@ -23,18 +22,10 @@ const SalesForecast = () => {
     };
 
     let unsubscribe: (() => void) | null = null;
-    let retryCount = 0;
-    const maxRetries = 50; // Limit retries to prevent infinite loops
     
     const initializeDataStore = () => {
-      if (retryCount >= maxRetries) {
-        console.warn('📈 SalesForecast: Max retries reached, stopping');
-        return;
-      }
-
       if (typeof window !== 'undefined' && window.dataStore) {
         console.log('📈 SalesForecast: Data store found, subscribing');
-        setIsDataStoreReady(true);
         
         // Check for existing data
         const existingTrend = window.dataStore.getData('salesTrend');
@@ -43,7 +34,7 @@ const SalesForecast = () => {
           updateTrendData(existingTrend);
         }
         
-        // Subscribe to changes only once
+        // Subscribe to changes
         unsubscribe = window.dataStore.subscribe((key: string, value: any) => {
           console.log('📈 SalesForecast: Data store update:', key, value);
           if (key === 'salesTrend' && value && typeof value === 'object') {
@@ -51,21 +42,29 @@ const SalesForecast = () => {
           }
         });
       } else {
-        retryCount++;
-        if (retryCount <= 10) { // Only log first 10 retries to avoid spam
-          console.log('📈 SalesForecast: Data store not ready, retrying...', retryCount);
-        }
-        setTimeout(initializeDataStore, 200); // Increased delay to reduce CPU usage
+        console.log('📈 SalesForecast: Data store not available');
       }
     };
 
+    // Try to initialize immediately
     initializeDataStore();
+
+    // Also listen for the analysis completion event
+    const handleAnalysisComplete = (event: CustomEvent) => {
+      console.log('📈 SalesForecast: Analysis completed event received', event.detail);
+      if (event.detail && event.detail.sales_trend) {
+        updateTrendData(event.detail.sales_trend);
+      }
+    };
+
+    window.addEventListener('analysisCompleted', handleAnalysisComplete as EventListener);
 
     return () => {
       if (unsubscribe) {
         console.log('📈 SalesForecast: Cleaning up subscription');
         unsubscribe();
       }
+      window.removeEventListener('analysisCompleted', handleAnalysisComplete as EventListener);
     };
   }, []);
 
@@ -120,9 +119,6 @@ const SalesForecast = () => {
             <p className="text-sm text-gray-500 mt-2">
               Average sentiment: {trendData.avg_sentiment.toFixed(3)}
             </p>
-          )}
-          {!isDataStoreReady && (
-            <p className="text-xs text-gray-400 mt-1">Waiting for data...</p>
           )}
         </div>
       </CardContent>

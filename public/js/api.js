@@ -25,6 +25,11 @@ class ApiService {
             const data = await response.json();
             console.log('=== API: RECEIVED DATA FROM BACKEND ===');
             console.log('Full response:', data);
+            console.log('Sentiment score:', data.sentiment_score);
+            console.log('Sales trend:', data.sales_trend);
+            console.log('Product info:', data.product_info);
+            console.log('Chart data:', data.chart_data);
+            console.log('Common phrases:', data.common_phrases);
 
             return data;
         } catch (error) {
