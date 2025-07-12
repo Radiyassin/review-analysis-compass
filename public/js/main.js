@@ -1,3 +1,4 @@
+
 let sentimentChart, distributionChart, countChart;
 
 window.addEventListener('load', () => {
@@ -68,10 +69,16 @@ async function analyze() {
 }
 
 function updateProductInfo(info) {
-    document.getElementById('productName').textContent = info["Product Name"] || 'N/A';
-    document.getElementById('brandName').textContent = info["Brand Name"] || 'N/A';
-    const price = info["Price"];
-    document.getElementById('price').textContent = price !== 'N/A' ? `$${parseFloat(price).toFixed(2)}` : 'N/A';
+    const productNameEl = document.getElementById('productName');
+    const brandNameEl = document.getElementById('brandName');
+    const priceEl = document.getElementById('price');
+    
+    if (productNameEl) productNameEl.textContent = info["Product Name"] || 'N/A';
+    if (brandNameEl) brandNameEl.textContent = info["Brand Name"] || 'N/A';
+    if (priceEl) {
+        const price = info["Price"];
+        priceEl.textContent = price !== 'N/A' ? `$${parseFloat(price).toFixed(2)}` : 'N/A';
+    }
 }
 
 function renderCharts(data) {
@@ -79,66 +86,80 @@ function renderCharts(data) {
     if (distributionChart) distributionChart.destroy();
     if (countChart) countChart.destroy();
 
-    const sc = document.getElementById('sentimentChart').getContext('2d');
-    sentimentChart = new Chart(sc, {
-        type: 'bar',
-        data: {
-            labels: data.sentiment.labels,
-            datasets: [{
-                label: 'Mean Score',
-                data: data.sentiment.means,
-                backgroundColor: ['#4CAF50', '#F44336']
-            }]
-        },
-        options: {
-            responsive: true,
-            scales: {
-                y: { beginAtZero: true, max: 1 }
-            }
-        }
-    });
+    const sentimentChartEl = document.getElementById('sentimentChart');
+    const distributionChartEl = document.getElementById('distributionChart');
+    const countChartEl = document.getElementById('countChart');
 
-    const dc = document.getElementById('distributionChart').getContext('2d');
-    distributionChart = new Chart(dc, {
-        type: 'pie',
-        data: {
-            labels: data.distribution.labels,
-            datasets: [{
-                data: data.distribution.values,
-                backgroundColor: ['#4CAF50', '#FFC107', '#F44336']
-            }]
-        }
-    });
-
-    const cc = document.getElementById('countChart').getContext('2d');
-    countChart = new Chart(cc, {
-        type: 'bar',
-        data: {
-            labels: data.counts.labels,
-            datasets: [{
-                label: 'Reviews',
-                data: data.counts.values,
-                backgroundColor: '#2196F3'
-            }]
-        },
-        options: {
-            responsive: true,
-            scales: {
-                y: { beginAtZero: true }
+    if (sentimentChartEl) {
+        const sc = sentimentChartEl.getContext('2d');
+        sentimentChart = new Chart(sc, {
+            type: 'bar',
+            data: {
+                labels: data.sentiment.labels,
+                datasets: [{
+                    label: 'Mean Score',
+                    data: data.sentiment.means,
+                    backgroundColor: ['#4CAF50', '#F44336']
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: { beginAtZero: true, max: 1 }
+                }
             }
-        }
-    });
+        });
+    }
+
+    if (distributionChartEl) {
+        const dc = distributionChartEl.getContext('2d');
+        distributionChart = new Chart(dc, {
+            type: 'pie',
+            data: {
+                labels: data.distribution.labels,
+                datasets: [{
+                    data: data.distribution.values,
+                    backgroundColor: ['#4CAF50', '#FFC107', '#F44336']
+                }]
+            }
+        });
+    }
+
+    if (countChartEl) {
+        const cc = countChartEl.getContext('2d');
+        countChart = new Chart(cc, {
+            type: 'bar',
+            data: {
+                labels: data.counts.labels,
+                datasets: [{
+                    label: 'Reviews',
+                    data: data.counts.values,
+                    backgroundColor: '#2196F3'
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    }
 }
 
 function renderPhrases(phrases) {
     const ul = document.getElementById('phraseList');
-    ul.innerHTML = phrases.length
-        ? phrases.map(p => `<li>${p[0]} (${p[1]}x)</li>`).join('')
-        : '<li>No common phrases found</li>';
+    if (ul) {
+        ul.innerHTML = phrases.length
+            ? phrases.map(p => `<li>${p[0]} (${p[1]}x)</li>`).join('')
+            : '<li>No common phrases found</li>';
+    }
 }
 
 function renderWordCloud(phrases) {
     const container = document.getElementById('wordCloud');
+    if (!container) return;
+    
     container.innerHTML = '';
 
     if (!phrases.length) {
@@ -231,9 +252,12 @@ function renderSentimentStars(sentimentScore) {
 
 function setupPdfDownload() {
     const btn = document.getElementById('downloadPdfBtn');
-    if (btn) {
+    if (btn && !btn.hasAttribute('data-initialized')) {
+        btn.setAttribute('data-initialized', 'true');
         btn.addEventListener('click', async () => {
             const container = document.querySelector('.container');
+            if (!container) return;
+            
             const clone = container.cloneNode(true);
 
             const canvases = container.querySelectorAll('canvas');
@@ -250,17 +274,19 @@ function setupPdfDownload() {
             clone.style.left = '-9999px';
             document.body.appendChild(clone);
 
-            const canvas = await html2canvas(clone, { scale: 2, useCORS: true });
-            const imgData = canvas.toDataURL('image/png');
-            const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF('p', 'mm', 'a4');
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+            try {
+                const canvas = await html2canvas(clone, { scale: 2, useCORS: true });
+                const imgData = canvas.toDataURL('image/png');
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
-            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-            pdf.save('product_report.pdf');
-
-            document.body.removeChild(clone);
+                pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                pdf.save('product_report.pdf');
+            } finally {
+                document.body.removeChild(clone);
+            }
         });
     }
 }
@@ -298,6 +324,8 @@ function toggleChatbot() {
 
 async function askBot() {
     const input = document.getElementById('userQuestion');
+    if (!input) return;
+    
     const question = input.value.trim();
     if (!question) return;
 
@@ -325,6 +353,8 @@ async function askBot() {
 
 function appendMessage(sender, text) {
     const chatLog = document.getElementById('chat-log');
+    if (!chatLog) return;
+    
     const msg = document.createElement('div');
     msg.className = `message ${sender}`;
     msg.textContent = text;
