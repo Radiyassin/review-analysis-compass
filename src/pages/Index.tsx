@@ -81,19 +81,10 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      {/* Header with Logo */}
-      <div className="text-center pt-8 pb-4">
-        <img 
-          src="/images/okk.png" 
-          alt="Logo" 
-          className="mx-auto max-h-24 object-contain"
-        />
-      </div>
-
       <div className="container mx-auto px-4 pb-8">
         <div className="max-w-7xl mx-auto">
           {/* Main Header */}
-          <div className="text-center mb-12">
+          <div className="text-center mb-12 pt-8">
             <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
               Sentiment Analysis Dashboard
             </h1>
