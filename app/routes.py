@@ -1,4 +1,3 @@
-
 from flask import Blueprint, send_from_directory, request, jsonify, send_file
 from app.services.analysis import analyze_reviews
 from app.utils.file_handler import save_uploaded_file, generate_excel_report
@@ -14,70 +13,105 @@ import traceback
 
 main_bp = Blueprint('main', __name__)
 
-# ... keep existing code (serve_index and serve_static routes)
+# Health check endpoint
+@main_bp.route('/api/health', methods=['GET'])
+def health_check():
+    print("🏥 Health check endpoint called")
+    return jsonify({
+        "status": "healthy",
+        "message": "Flask API Backend is running!",
+        "timestamp": datetime.now().isoformat(),
+        "endpoints": [
+            "GET /api/health - Health check",
+            "POST /api/upload - File upload and analysis", 
+            "POST /api/chat - Chatbot functionality"
+        ]
+    })
+
+# Root endpoint for API info
+@main_bp.route('/', methods=['GET'])
+@main_bp.route('/api', methods=['GET'])
+def api_info():
+    print("📋 API info endpoint called")
+    return jsonify({
+        "message": "Flask API Backend - Review Analysis Service",
+        "version": "1.0.0",
+        "endpoints": {
+            "health": "GET /api/health",
+            "upload": "POST /api/upload",
+            "chat": "POST /api/chat"
+        },
+        "status": "running"
+    })
 
 # API Routes
-@main_bp.route('/api/upload', methods=['POST'])
+@main_bp.route('/api/upload', methods=['POST', 'OPTIONS'])
 def upload_file():
-    # ... keep existing code (entire upload_file function)
+    # Handle CORS preflight
+    if request.method == 'OPTIONS':
+        return '', 200
+        
     try:
-        print("\n" + "="*50)
-        print("UPLOAD ENDPOINT CALLED")
-        print("="*50)
+        print("\n" + "="*60)
+        print("📤 UPLOAD ENDPOINT CALLED")
+        print("="*60)
+        print(f"🔍 Request method: {request.method}")
+        print(f"🔍 Content type: {request.content_type}")
+        print(f"🔍 Files in request: {list(request.files.keys())}")
         
         # Check if file is in request
         if 'file' not in request.files:
-            print("ERROR: No file in request.files")
+            print("❌ ERROR: No file in request.files")
             print("Available keys:", list(request.files.keys()))
             return jsonify({"error": "No file uploaded", "success": False}), 400
 
         file = request.files['file']
         if not file or file.filename == '':
-            print("ERROR: Empty filename or no file")
+            print("❌ ERROR: Empty filename or no file")
             return jsonify({"error": "No selected file", "success": False}), 400
 
-        print(f"Processing file: {file.filename}")
-        print(f"File size: {file.content_length if hasattr(file, 'content_length') else 'Unknown'}")
+        print(f"📄 Processing file: {file.filename}")
+        print(f"📦 File size: {file.content_length if hasattr(file, 'content_length') else 'Unknown'}")
 
         # Ensure uploads directory exists
         uploads_dir = 'uploads'
         if not os.path.exists(uploads_dir):
             os.makedirs(uploads_dir)
-            print(f"Created uploads directory: {uploads_dir}")
+            print(f"📁 Created uploads directory: {uploads_dir}")
 
         # Save file with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"{timestamp}_{file.filename}"
         file_path = os.path.join(uploads_dir, filename)
         
-        print(f"Saving file to: {file_path}")
+        print(f"💾 Saving file to: {file_path}")
         file.save(file_path)
         
         if not os.path.exists(file_path):
-            print("ERROR: File was not saved properly")
+            print("❌ ERROR: File was not saved properly")
             return jsonify({"error": "Failed to save file", "success": False}), 500
             
-        print(f"File saved successfully. Size: {os.path.getsize(file_path)} bytes")
+        print(f"✅ File saved successfully. Size: {os.path.getsize(file_path)} bytes")
 
         # Read and validate CSV
         try:
-            print("Reading CSV file...")
+            print("📊 Reading CSV file...")
             df = pd.read_csv(file_path, encoding='utf-8')
-            print(f"CSV loaded: {len(df)} rows, {len(df.columns)} columns")
-            print(f"Columns: {list(df.columns)}")
-            print(f"First few rows preview:")
+            print(f"✅ CSV loaded: {len(df)} rows, {len(df.columns)} columns")
+            print(f"📋 Columns: {list(df.columns)}")
+            print(f"👀 First few rows preview:")
             print(df.head().to_string())
             
         except UnicodeDecodeError:
             try:
-                print("UTF-8 failed, trying latin-1 encoding...")
+                print("🔄 UTF-8 failed, trying latin-1 encoding...")
                 df = pd.read_csv(file_path, encoding='latin-1')
-                print(f"CSV loaded with latin-1: {len(df)} rows, {len(df.columns)} columns")
+                print(f"✅ CSV loaded with latin-1: {len(df)} rows, {len(df.columns)} columns")
             except Exception as e:
-                print(f"ERROR reading CSV with latin-1: {str(e)}")
+                print(f"❌ ERROR reading CSV with latin-1: {str(e)}")
                 return jsonify({"error": f"Failed to read CSV file: {str(e)}", "success": False}), 400
         except Exception as e:
-            print(f"ERROR reading CSV: {str(e)}")
+            print(f"❌ ERROR reading CSV: {str(e)}")
             return jsonify({"error": f"Failed to read CSV: {str(e)}", "success": False}), 400
 
         # Check for required columns
@@ -85,12 +119,12 @@ def upload_file():
         missing_cols = [col for col in required_columns if col not in df.columns]
         
         if missing_cols:
-            print(f"Missing required columns: {missing_cols}")
-            print(f"Available columns: {list(df.columns)}")
+            print(f"❌ Missing required columns: {missing_cols}")
+            print(f"📋 Available columns: {list(df.columns)}")
             # Try to find similar column names
             potential_review_cols = [col for col in df.columns if 'review' in col.lower() or 'comment' in col.lower() or 'feedback' in col.lower()]
             if potential_review_cols:
-                print(f"Potential review columns found: {potential_review_cols}")
+                print(f"🔍 Potential review columns found: {potential_review_cols}")
                 return jsonify({
                     "error": f"Missing 'Reviews' column. Found potential columns: {', '.join(potential_review_cols)}",
                     "available_columns": list(df.columns),
@@ -104,7 +138,7 @@ def upload_file():
                 }), 400
 
         # Clean the data
-        print("Cleaning data...")
+        print("🧹 Cleaning data...")
         original_count = len(df)
         
         # Handle missing values in Reviews column
@@ -113,18 +147,18 @@ def upload_file():
         df = df[df['Reviews'].astype(str) != 'nan']
         
         cleaned_count = len(df)
-        print(f"Data cleaned: {cleaned_count} rows remaining (from {original_count})")
+        print(f"✅ Data cleaned: {cleaned_count} rows remaining (from {original_count})")
 
         if cleaned_count == 0:
             return jsonify({"error": "No valid reviews found after cleaning", "success": False}), 400
 
         # Perform sentiment analysis
-        print("Starting sentiment analysis...")
+        print("🔍 Starting sentiment analysis...")
         from app.utils.nlp_processor import analyze_sentiment
         
         df = analyze_sentiment(df, 'Reviews')
-        print("Sentiment analysis completed")
-        print(df['sentiment'].value_counts().to_dict())
+        print("✅ Sentiment analysis completed")
+        print("📊 Sentiment distribution:", df['sentiment'].value_counts().to_dict())
 
         # Extract product information
         print("Extracting product information...")
@@ -245,166 +279,95 @@ def upload_file():
             }
         }
 
-        # Store enhanced context for chatbot
+        # Store context for chatbot
         try:
-            # Store more comprehensive context
-            session['reviews_data'] = {
-                'all_reviews': df['Reviews'].tolist()[:100],  # Store up to 100 reviews
-                'positive_reviews': df[df['sentiment'] == 'positive']['Reviews'].tolist()[:20],
-                'negative_reviews': df[df['sentiment'] == 'negative']['Reviews'].tolist()[:20],
-                'neutral_reviews': df[df['sentiment'] == 'neutral']['Reviews'].tolist()[:10],
-                'sentiment_stats': {
-                    'positive_count': int(pos_count),
-                    'negative_count': int(neg_count),
-                    'neutral_count': int(neu_count),
-                    'overall_sentiment': float(overall_sentiment)
-                },
-                'common_phrases': common_phrases,
-                'negative_phrases': negative_phrases
-            }
+            reviews_sample = " ".join(df['Reviews'].astype(str).head(50).tolist())[:2000]
+            session['reviews_text'] = reviews_sample
             session['product_info'] = product_info
-            print("Enhanced context stored for chatbot")
+            print("Context stored for chatbot")
         except Exception as e:
             print(f"Warning: Could not store context for chatbot: {str(e)}")
 
-        print("="*50)
-        print("ANALYSIS COMPLETED SUCCESSFULLY")
-        print(f"Response keys: {list(response_data.keys())}")
-        print("="*50)
+        print("="*60)
+        print("🎉 ANALYSIS COMPLETED SUCCESSFULLY")
+        print(f"📦 Response keys: {list(response_data.keys())}")
+        print("="*60)
         
         return jsonify(response_data)
 
     except Exception as e:
-        print(f"\n{'='*50}")
-        print("CRITICAL ERROR IN UPLOAD ENDPOINT")
-        print(f"{'='*50}")
-        print(f"Error: {str(e)}")
-        print("Full traceback:")
+        print(f"\n{'='*60}")
+        print("💥 CRITICAL ERROR IN UPLOAD ENDPOINT")
+        print(f"{'='*60}")
+        print(f"❌ Error: {str(e)}")
+        print("🔍 Full traceback:")
         traceback.print_exc()
-        print(f"{'='*50}")
+        print(f"{'='*60}")
         
         return jsonify({
             "error": f"Internal server error: {str(e)}",
             "success": False
         }), 500
 
-@main_bp.route('/api/chat', methods=['POST'])
+@main_bp.route('/api/chat', methods=['POST', 'OPTIONS'])
 def chat():
+    # Handle CORS preflight
+    if request.method == 'OPTIONS':
+        return '', 200
+        
     try:
-        print("\n" + "="*30)
-        print("CHATBOT ENDPOINT CALLED")
-        print("="*30)
+        print("\n" + "="*50)
+        print("💬 CHAT ENDPOINT CALLED")
+        print("="*50)
         
         if not current_app.config.get('OPENAI_API_KEY'):
+            print("❌ OpenAI API key not configured")
             return jsonify({'answer': "OpenAI API key not configured. Please set OPENAI_API_KEY environment variable."})
 
         client = openai.OpenAI(api_key=current_app.config['OPENAI_API_KEY'])
 
-        question = request.json.get('question', '').strip()
-        if not question:
-            return jsonify({'answer': "Please ask me a question about the product reviews."})
-
-        # Get enhanced context from session
-        reviews_data = session.get('reviews_data', {})
+        question = request.json.get('question', '')
+        context = session.get('reviews_text', '')
         product_info = session.get('product_info', {})
+        
+        print(f"❓ Question: {question}")
+        print(f"📝 Context available: {'Yes' if context else 'No'}")
 
-        if not reviews_data:
+        if not context:
+            print("❌ No context available")
             return jsonify({'answer': "Please upload a product review file first to enable chat functionality."})
 
-        print(f"Question: {question}")
-        print(f"Available reviews: {len(reviews_data.get('all_reviews', []))}")
+        prompt = f"""You are a helpful assistant analyzing customer reviews for this product:
+Product: {product_info.get('Product Name', 'Unknown')}
+Brand: {product_info.get('Brand Name', 'Unknown')}
+Price: {product_info.get('Price', 'Unknown')}
 
-        # Analyze question type and provide context-specific responses
-        question_lower = question.lower()
-        
-        # Determine question type and build appropriate context
-        context_parts = []
-        
-        # Add product information
-        context_parts.append(f"Product: {product_info.get('Product Name', 'Unknown')}")
-        context_parts.append(f"Brand: {product_info.get('Brand Name', 'Unknown')}")
-        context_parts.append(f"Price: {product_info.get('Price', 'Unknown')}")
-        
-        # Add sentiment statistics
-        stats = reviews_data.get('sentiment_stats', {})
-        context_parts.append(f"Total Reviews: {stats.get('positive_count', 0) + stats.get('negative_count', 0) + stats.get('neutral_count', 0)}")
-        context_parts.append(f"Positive Reviews: {stats.get('positive_count', 0)}")
-        context_parts.append(f"Negative Reviews: {stats.get('negative_count', 0)}")
-        context_parts.append(f"Overall Sentiment Score: {stats.get('overall_sentiment', 0):.3f}")
-
-        # Add relevant reviews based on question type
-        if any(word in question_lower for word in ['positive', 'good', 'like', 'love', 'best', 'great']):
-            positive_reviews = reviews_data.get('positive_reviews', [])[:10]
-            if positive_reviews:
-                context_parts.append("Recent Positive Reviews:")
-                for i, review in enumerate(positive_reviews, 1):
-                    context_parts.append(f"{i}. {review[:200]}...")
-                    
-        elif any(word in question_lower for word in ['negative', 'bad', 'hate', 'worst', 'problem', 'issue', 'complaint']):
-            negative_reviews = reviews_data.get('negative_reviews', [])[:10]
-            if negative_reviews:
-                context_parts.append("Recent Negative Reviews:")
-                for i, review in enumerate(negative_reviews, 1):
-                    context_parts.append(f"{i}. {review[:200]}...")
-                    
-        elif any(word in question_lower for word in ['common', 'frequent', 'often', 'mention', 'phrase']):
-            common_phrases = reviews_data.get('common_phrases', [])[:10]
-            negative_phrases = reviews_data.get('negative_phrases', [])[:5]
-            if common_phrases:
-                context_parts.append("Most Common Words/Phrases:")
-                context_parts.append(", ".join([f"{phrase[0]} ({phrase[1]})" for phrase in common_phrases]))
-            if negative_phrases:
-                context_parts.append("Common Issues Mentioned:")
-                context_parts.append(", ".join([f"{phrase[0]} ({phrase[1]})" for phrase in negative_phrases]))
-        else:
-            # General question - provide mixed sample
-            all_reviews = reviews_data.get('all_reviews', [])[:15]
-            if all_reviews:
-                context_parts.append("Sample Reviews:")
-                for i, review in enumerate(all_reviews, 1):
-                    context_parts.append(f"{i}. {review[:150]}...")
-
-        context = "\n".join(context_parts)
-
-        # Create enhanced prompt based on question type
-        if any(word in question_lower for word in ['recommend', 'should', 'buy', 'purchase']):
-            system_prompt = """You are a helpful product review analyst. Based on customer reviews and sentiment analysis, provide recommendations about whether someone should buy this product. Be honest about both pros and cons."""
-        elif any(word in question_lower for word in ['improve', 'better', 'fix', 'solve']):
-            system_prompt = """You are a helpful product review analyst. Focus on actionable insights from customer feedback that could help improve the product or address common issues."""
-        else:
-            system_prompt = """You are a helpful product review analyst. Provide insights based on customer sentiment and feedback. Be specific and reference the data when possible."""
-
-        user_prompt = f"""Based on the following product information and customer reviews:
-
+Here are some customer reviews:
+---
 {context}
+---
 
 Question: {question}
 
-Please provide a helpful, specific answer based on the review data. Use numbers and percentages when relevant, and cite specific customer feedback when appropriate."""
+Please provide a helpful answer based on the reviews and product information."""
 
-        print(f"Sending request to OpenAI...")
-        print(f"Context length: {len(context)} characters")
-
+        print("🤖 Sending request to OpenAI...")
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
+                {"role": "system", "content": "You are a helpful product review analyst."},
+                {"role": "user", "content": prompt}
             ],
-            max_tokens=300,
+            max_tokens=200,
             temperature=0.7
         )
         
-        answer = response.choices[0].message.content.strip()
-        
-        print(f"OpenAI Response: {answer[:100]}...")
-        print("="*30)
-        print("CHATBOT RESPONSE SENT")
-        print("="*30)
-        
+        answer = response.choices[0].message.content
+        print(f"✅ OpenAI Response: {answer[:100]}...")
+        print("="*50)
         return jsonify({'answer': answer})
         
     except Exception as e:
-        print(f"Chat error: {str(e)}")
+        print(f"❌ Chat error: {str(e)}")
         traceback.print_exc()
-        return jsonify({'answer': f"I apologize, but I encountered an error while processing your question. Please try again or rephrase your question."})
+        return jsonify({'answer': f"Sorry, there was an error processing your question: {str(e)}"})
