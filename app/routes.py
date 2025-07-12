@@ -1,4 +1,3 @@
-
 from flask import Blueprint, send_from_directory, request, jsonify, send_file
 from app.services.analysis import analyze_reviews
 from app.utils.file_handler import save_uploaded_file, generate_excel_report
@@ -17,16 +16,45 @@ main_bp = Blueprint('main', __name__)
 # Serve React app
 @main_bp.route('/')
 def serve_index():
-    return send_from_directory('dist', 'index.html')
+    try:
+        dist_path = current_app.static_folder
+        index_path = os.path.join(dist_path, 'index.html')
+        
+        print(f"Trying to serve index.html from: {index_path}")
+        print(f"File exists: {os.path.exists(index_path)}")
+        
+        if os.path.exists(index_path):
+            return send_from_directory(dist_path, 'index.html')
+        else:
+            return """
+            <h1>React Build Not Found</h1>
+            <p>Please run the following commands to build the React app:</p>
+            <pre>
+npm install
+npm run build
+            </pre>
+            <p>Then restart the Flask server with: <code>python main.py</code></p>
+            """, 404
+    except Exception as e:
+        print(f"Error serving index: {str(e)}")
+        return f"Error: {str(e)}", 500
 
 @main_bp.route('/<path:path>')
 def serve_static(path):
-    # Try to serve from dist first (React build)
     try:
-        return send_from_directory('dist', path)
-    except:
-        # Fallback to assets
-        return send_from_directory('dist/assets', path)
+        dist_path = current_app.static_folder
+        file_path = os.path.join(dist_path, path)
+        
+        print(f"Trying to serve static file: {file_path}")
+        
+        if os.path.exists(file_path):
+            return send_from_directory(dist_path, path)
+        else:
+            # If file doesn't exist, serve index.html for React routing
+            return serve_index()
+    except Exception as e:
+        print(f"Error serving static file {path}: {str(e)}")
+        return serve_index()
 
 # API Routes
 @main_bp.route('/api/upload', methods=['POST'])
