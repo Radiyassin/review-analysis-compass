@@ -1,0 +1,8 @@
+
+# This file ensures the images directory is tracked by git
+# You can delete this file once you add your actual images
+
+Place your images in this directory:
+- intro.gif (animated GIF for the intro screen)
+- okk.png (company/product logo)
+- favicon.ico (browser tab icon)
