@@ -95,6 +95,11 @@ window.analyze = async function() {
             window.dispatchEvent(salesEvent);
             console.log('Dispatched salesTrendUpdate event with trend:', data.sales_trend);
             
+            // Dispatch analysis completion event to show results in UI
+            const completionEvent = new CustomEvent('analysisCompleted');
+            window.dispatchEvent(completionEvent);
+            console.log('Dispatched analysisCompleted event');
+            
         }, 200);
 
         // Also dispatch events immediately (double dispatch for reliability)
@@ -110,7 +115,10 @@ window.analyze = async function() {
         });
         window.dispatchEvent(immediateEvent2);
 
-        alert('Analysis completed successfully! Check the results below.');
+        // Dispatch completion event immediately as well
+        const immediateCompletionEvent = new CustomEvent('analysisCompleted');
+        window.dispatchEvent(immediateCompletionEvent);
+
         console.log('=== ANALYSIS COMPLETED ===');
         
     } catch (error) {

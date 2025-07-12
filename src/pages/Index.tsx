@@ -17,6 +17,7 @@ const Index = () => {
   const [showResults, setShowResults] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showIntro, setShowIntro] = useState(true);
+  const [analysisComplete, setAnalysisComplete] = useState(false);
 
   useEffect(() => {
     // Hide intro gif after 3 seconds
@@ -27,21 +28,49 @@ const Index = () => {
     return () => clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    // Listen for analysis completion
+    const handleAnalysisComplete = () => {
+      console.log('Analysis completed - showing results');
+      setIsAnalyzing(false);
+      setShowResults(true);
+      setAnalysisComplete(true);
+      
+      // Scroll to results section
+      setTimeout(() => {
+        const resultsSection = document.getElementById('results');
+        if (resultsSection) {
+          resultsSection.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
+    };
+
+    // Listen for custom events
+    window.addEventListener('analysisCompleted', handleAnalysisComplete);
+    
+    return () => {
+      window.removeEventListener('analysisCompleted', handleAnalysisComplete);
+    };
+  }, []);
+
   const handleAnalyze = () => {
     setIsAnalyzing(true);
-    setShowResults(true);
+    setAnalysisComplete(false);
     
     // Call the main.js analyze function if available
     if (typeof window !== 'undefined' && window.analyze) {
       window.analyze().then(() => {
-        setIsAnalyzing(false);
+        // The event listener will handle showing results
       }).catch(() => {
         setIsAnalyzing(false);
+        alert('Analysis failed. Please try again.');
       });
     } else {
       // Fallback simulation
       setTimeout(() => {
         setIsAnalyzing(false);
+        setShowResults(true);
+        setAnalysisComplete(true);
       }, 2000);
     }
   };
@@ -108,8 +137,36 @@ const Index = () => {
             </CardContent>
           </Card>
 
+          {/* Analysis Status */}
+          {isAnalyzing && (
+            <Card className="mb-8 bg-blue-50 border-blue-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-center gap-3">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  <span className="text-blue-700 font-medium">Processing your CSV file...</span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Success Message */}
+          {analysisComplete && (
+            <Card className="mb-8 bg-green-50 border-green-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-center gap-3">
+                  <div className="h-6 w-6 bg-green-600 rounded-full flex items-center justify-center">
+                    <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                  </div>
+                  <span className="text-green-700 font-medium">Analysis completed successfully! Check the results below.</span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Results Section */}
-          <div id="results" className={`space-y-8 ${showResults ? 'block animate-fade-in' : 'hidden'}`}>
+          <div id="results" className={`space-y-8 transition-all duration-500 ${showResults ? 'block animate-fade-in' : 'hidden'}`}>
             {/* Analysis Results Header */}
             <div className="text-center mb-8">
               <h2 className="text-3xl font-bold text-gray-800 mb-4">Analysis Results</h2>
