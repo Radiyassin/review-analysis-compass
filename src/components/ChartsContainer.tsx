@@ -131,25 +131,23 @@ const ChartCard: React.FC<ChartCardProps> = ({ title, icon, data, chartType }) =
       return;
     }
 
-    console.log(`📊 Initializing ${title} chart with data:`, data);
+    console.log(`📊 Rendering ${title} chart with data:`, data);
 
-    // Destroy existing chart instance before creating new one
+    // Destroy existing chart instance
     if (chartInstanceRef.current) {
       try {
         chartInstanceRef.current.destroy();
-        chartInstanceRef.current = null;
       } catch (error) {
         console.warn(`📊 Error destroying ${title} chart:`, error);
       }
+      chartInstanceRef.current = null;
     }
 
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
     try {
-      const ctx = canvasRef.current.getContext('2d');
-      if (!ctx) return;
-
-      // Clear the canvas
-      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-
       let chartConfig: any = {
         type: chartType,
         options: { 
@@ -181,9 +179,9 @@ const ChartCard: React.FC<ChartCardProps> = ({ title, icon, data, chartType }) =
       }
 
       chartInstanceRef.current = new window.Chart(ctx, chartConfig);
-      console.log(`📊 ${title} chart initialized successfully`);
+      console.log(`📊 ${title} chart rendered successfully`);
     } catch (error) {
-      console.error(`📊 Error initializing ${title} chart:`, error);
+      console.error(`📊 Error rendering ${title} chart:`, error);
     }
 
     // Cleanup function
@@ -191,10 +189,10 @@ const ChartCard: React.FC<ChartCardProps> = ({ title, icon, data, chartType }) =
       if (chartInstanceRef.current) {
         try {
           chartInstanceRef.current.destroy();
-          chartInstanceRef.current = null;
         } catch (error) {
           console.warn(`📊 Error cleaning up ${title} chart:`, error);
         }
+        chartInstanceRef.current = null;
       }
     };
   }, [data, title, chartType]);
