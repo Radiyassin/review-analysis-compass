@@ -42,7 +42,9 @@ const SalesForecast = () => {
           }
         });
       } else {
-        console.log('📈 SalesForecast: Data store not available');
+        console.log('📈 SalesForecast: Data store not available, will retry...');
+        // Retry after a short delay
+        setTimeout(initializeDataStore, 100);
       }
     };
 

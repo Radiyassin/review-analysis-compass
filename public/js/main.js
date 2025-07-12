@@ -2,14 +2,15 @@
 // Main application entry point
 console.log('Loading main application...');
 
-// Create global dataStore immediately
+// Create global dataStore immediately - this MUST be first
 if (!window.dataStore) {
     // Inline DataStore class to ensure it's available immediately
     class DataStore {
         constructor() {
             this.data = {};
             this.listeners = new Set();
-            this.isReady = false;
+            this.isReady = true; // Mark as ready immediately
+            console.log('DataStore: Created and ready');
         }
 
         setData(key, value) {
@@ -50,16 +51,10 @@ if (!window.dataStore) {
             this.data = {};
             this.notifyListeners('clear', null);
         }
-
-        markReady() {
-            this.isReady = true;
-            console.log('DataStore: Marked as ready');
-        }
     }
 
     window.dataStore = new DataStore();
-    window.dataStore.markReady(); // Mark as ready immediately
-    console.log('DataStore initialized and ready');
+    console.log('DataStore initialized and available globally');
 }
 
 // Prevent multiple initializations
@@ -133,26 +128,39 @@ if (window.mainAppLoaded) {
 
         console.log('Selected file:', selectedFile.name, 'Size:', selectedFile.size);
         
-        // Show loading state with correct selector
-        const analyzeBtn = document.querySelector('button[class*="bg-gradient-to-r"][class*="from-blue-600"]');
+        // Show loading state - try multiple selectors
+        const analyzeBtns = [
+            document.querySelector('button[class*="bg-gradient-to-r"][class*="from-blue-600"]'),
+            document.querySelector('.btn-blue'),
+            document.querySelector('[class*="Analyze"]')
+        ];
+        
+        let analyzeBtn = analyzeBtns.find(btn => btn !== null);
+        console.log('Found analyze button:', analyzeBtn);
+        
         if (analyzeBtn) {
             analyzeBtn.disabled = true;
             analyzeBtn.innerHTML = '<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>Analyzing...';
+            console.log('Button updated to loading state');
+        } else {
+            console.warn('Analyze button not found!');
         }
 
         try {
             // Upload and analyze file
+            console.log('Starting API call...');
             const data = await ApiService.uploadFile(selectedFile);
+            console.log('API call completed, received data:', data);
 
             if (!data.success && !data.chart_data) {
                 throw new Error('Invalid response from server');
             }
 
             console.log('=== STORING DATA IN DATASTORE ===');
-            console.log('Full data received:', data);
             
             // Store all data in the centralized data store
             if (window.dataStore) {
+                console.log('DataStore found, storing data...');
                 window.dataStore.setData('sentimentScore', data.sentiment_score || 0);
                 window.dataStore.setData('salesTrend', data.sales_trend || { trend: 'Stable', avg_sentiment: 0, message: 'No data' });
                 window.dataStore.setData('productInfo', data.product_info || { 'Product Name': 'N/A', 'Brand Name': 'N/A', 'Price': 'N/A' });
@@ -162,19 +170,24 @@ if (window.mainAppLoaded) {
                 
                 console.log('=== DATA STORED, CURRENT DATASTORE CONTENTS ===');
                 console.log(window.dataStore.getAllData());
+            } else {
+                console.error('DataStore not found!');
             }
 
             // Update DOM-based UI components
             if (window.DOMUpdater) {
+                console.log('Updating DOM components...');
                 DOMUpdater.updateProductInfo(data.product_info || {});
                 DOMUpdater.updatePhrases(data.common_phrases || []);
             }
             
             if (data.chart_data && window.ChartManager) {
+                console.log('Updating charts...');
                 ChartManager.update(data.chart_data);
             }
 
             // Dispatch custom event for React components
+            console.log('Dispatching analysisCompleted event...');
             const event = new CustomEvent('analysisCompleted', { detail: data });
             window.dispatchEvent(event);
 
@@ -188,10 +201,10 @@ if (window.mainAppLoaded) {
             }
         } finally {
             // Reset button state
-            const analyzeBtn = document.querySelector('button[class*="bg-gradient-to-r"][class*="from-blue-600"]');
             if (analyzeBtn) {
                 analyzeBtn.disabled = false;
                 analyzeBtn.innerHTML = '<svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>Analyze CSV';
+                console.log('Button reset to original state');
             }
         }
     };

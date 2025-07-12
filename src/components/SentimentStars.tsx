@@ -46,7 +46,9 @@ const SentimentStars = () => {
           }
         });
       } else {
-        console.log('🌟 SentimentStars: Data store not available');
+        console.log('🌟 SentimentStars: Data store not available, will retry...');
+        // Retry after a short delay
+        setTimeout(initializeDataStore, 100);
       }
     };
 
