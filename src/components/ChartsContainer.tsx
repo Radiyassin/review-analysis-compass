@@ -69,24 +69,24 @@ const ChartsContainer = () => {
   }, []);
 
   return (
-    <div className="chart-container grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+    <div className="chart-container grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
       {chartData ? (
         <>
           <ChartCard
             title="Sentiment Scores"
-            icon={<BarChart3 className="h-5 w-5 text-blue-600" />}
+            icon={<BarChart3 className="h-6 w-6 text-blue-600" />}
             data={chartData.sentiment}
             chartType="bar"
           />
           <ChartCard
             title="Review Distribution"
-            icon={<PieChart className="h-5 w-5 text-purple-600" />}
+            icon={<PieChart className="h-6 w-6 text-purple-600" />}
             data={chartData.distribution}
             chartType="doughnut"
           />
           <ChartCard
             title="Review Counts"
-            icon={<TrendingUp className="h-5 w-5 text-green-600" />}
+            icon={<TrendingUp className="h-6 w-6 text-green-600" />}
             data={chartData.counts}
             chartType="bar"
           />
@@ -95,15 +95,15 @@ const ChartsContainer = () => {
         <>
           <PlaceholderCard
             title="Sentiment Scores"
-            icon={<BarChart3 className="h-5 w-5 text-blue-600" />}
+            icon={<BarChart3 className="h-6 w-6 text-blue-600" />}
           />
           <PlaceholderCard
             title="Review Distribution"
-            icon={<PieChart className="h-5 w-5 text-purple-600" />}
+            icon={<PieChart className="h-6 w-6 text-purple-600" />}
           />
           <PlaceholderCard
             title="Review Counts"
-            icon={<TrendingUp className="h-5 w-5 text-green-600" />}
+            icon={<TrendingUp className="h-6 w-6 text-green-600" />}
           />
         </>
       )}
@@ -154,8 +154,34 @@ const ChartCard: React.FC<ChartCardProps> = ({ title, icon, data, chartType }) =
           responsive: true, 
           maintainAspectRatio: false,
           plugins: { 
-            legend: { display: chartType === 'doughnut' }
-          }
+            legend: { 
+              display: chartType === 'doughnut',
+              labels: {
+                font: {
+                  size: 14,
+                  weight: 'bold'
+                }
+              }
+            }
+          },
+          scales: chartType === 'bar' ? {
+            x: {
+              ticks: {
+                font: {
+                  size: 12,
+                  weight: 'bold'
+                }
+              }
+            },
+            y: {
+              ticks: {
+                font: {
+                  size: 12,
+                  weight: 'bold'
+                }
+              }
+            }
+          } : undefined
         }
       };
 
@@ -198,15 +224,15 @@ const ChartCard: React.FC<ChartCardProps> = ({ title, icon, data, chartType }) =
   }, [data, title, chartType]);
 
   return (
-    <Card className="shadow-lg border-0 hover:shadow-xl transition-shadow duration-300">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg">
+    <Card className="shadow-xl border-0 hover:shadow-2xl transition-shadow duration-300">
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-3 text-xl font-bold">
           {icon}
           {title}
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="bg-white p-4 rounded-lg h-64">
+        <div className="bg-white p-6 rounded-lg h-80 shadow-inner">
           <canvas ref={canvasRef}></canvas>
         </div>
       </CardContent>
@@ -221,16 +247,16 @@ interface PlaceholderCardProps {
 
 const PlaceholderCard: React.FC<PlaceholderCardProps> = ({ title, icon }) => {
   return (
-    <Card className="shadow-lg border-0 hover:shadow-xl transition-shadow duration-300">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg">
+    <Card className="shadow-xl border-0 hover:shadow-2xl transition-shadow duration-300">
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-3 text-xl font-bold">
           {icon}
           {title}
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="bg-white p-4 rounded-lg h-64 flex items-center justify-center">
-          <p className="text-gray-500">Waiting for analysis data...</p>
+        <div className="bg-white p-6 rounded-lg h-80 flex items-center justify-center shadow-inner">
+          <p className="text-gray-500 font-medium">Waiting for analysis data...</p>
         </div>
       </CardContent>
     </Card>

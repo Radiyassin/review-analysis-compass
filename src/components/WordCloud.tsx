@@ -78,11 +78,13 @@ const WordCloud = () => {
     wordData.forEach((word, index) => {
       const wordElement = document.createElement('div');
       wordElement.textContent = word.text;
-      wordElement.className = `absolute cursor-pointer transition-all duration-300 hover:scale-110 font-medium ${colors[index % colors.length]}`;
+      wordElement.className = `absolute cursor-pointer transition-all duration-300 hover:scale-125 font-black ${colors[index % colors.length]} drop-shadow-lg`;
       
-      // Calculate font size based on value
-      const fontSize = Math.max(12, Math.min(32, word.value * 2));
+      // Calculate font size based on value - made bigger
+      const fontSize = Math.max(16, Math.min(42, word.value * 2.5));
       wordElement.style.fontSize = `${fontSize}px`;
+      wordElement.style.fontWeight = '900';
+      wordElement.style.textShadow = '2px 2px 4px rgba(0,0,0,0.3)';
       
       // Position in a spiral pattern
       const angle = index * 0.8;
@@ -108,10 +110,10 @@ const WordCloud = () => {
   return (
     <div 
       ref={containerRef}
-      className="w-full h-96 border border-gray-200 rounded-lg bg-white relative overflow-hidden flex items-center justify-center"
+      className="w-full h-96 border-2 border-gray-300 rounded-xl bg-gradient-to-br from-white to-gray-50 relative overflow-hidden flex items-center justify-center shadow-inner"
     >
       {wordData.length === 0 && (
-        <p className="text-gray-500 absolute">Word cloud will appear here after analysis</p>
+        <p className="text-gray-500 absolute font-semibold">Word cloud will appear here after analysis</p>
       )}
     </div>
   );
