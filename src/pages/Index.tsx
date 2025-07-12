@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Upload, FileText, TrendingUp, MessageCircle, Download, Star, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,7 @@ import CommonPhrases from '@/components/CommonPhrases';
 import Chatbot from '@/components/Chatbot';
 import IntroGif from '@/components/IntroGif';
 import SalesForecast from '@/components/SalesForecast';
+import DownloadReport from '@/components/DownloadReport';
 
 const Index = () => {
   const [showResults, setShowResults] = useState(false);
@@ -199,15 +199,7 @@ const Index = () => {
             <CommonPhrases />
 
             {/* Download Report */}
-            <div className="text-center pt-8">
-              <Button 
-                id="downloadPdfBtn"
-                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-3 rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
-              >
-                <Download className="h-5 w-5 mr-2" />
-                Download Product Report (PDF)
-              </Button>
-            </div>
+            <DownloadReport />
           </div>
         </div>
       </div>
