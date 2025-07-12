@@ -17,44 +17,38 @@ const SalesForecast = () => {
 
     // Function to update trend data
     const updateTrendData = (data: SalesTrendData) => {
-      console.log('Updating trend data:', data);
+      console.log('SalesForecast: Updating trend data:', data);
       setTrendData(data);
     };
 
     // Listen for sales trend updates from main.js
     const handleSalesTrendUpdate = (event: CustomEvent) => {
-      console.log('SalesForecast received event:', event.detail);
-      updateTrendData(event.detail);
+      console.log('SalesForecast: Received salesTrendUpdate event:', event.detail);
+      if (event.detail && typeof event.detail === 'object') {
+        updateTrendData(event.detail);
+      }
     };
 
     // Add event listener
     window.addEventListener('salesTrendUpdate', handleSalesTrendUpdate as EventListener);
     
-    // Check if window has the data already
-    const checkForData = () => {
-      if (typeof window !== 'undefined' && (window as any).currentSalesTrend) {
-        const salesTrend = (window as any).currentSalesTrend;
-        console.log('SalesForecast found existing data:', salesTrend);
-        updateTrendData(salesTrend);
-        return true;
-      }
-      return false;
+    // Also listen for analysis completion to check for data
+    const handleAnalysisComplete = () => {
+      console.log('SalesForecast: Analysis completed, checking for data...');
+      setTimeout(() => {
+        if (typeof window !== 'undefined' && (window as any).currentSalesTrend) {
+          const salesTrend = (window as any).currentSalesTrend;
+          console.log('SalesForecast: Found sales trend after analysis:', salesTrend);
+          updateTrendData(salesTrend);
+        }
+      }, 500); // Small delay to ensure data is set
     };
 
-    // Check immediately and set up polling
-    if (!checkForData()) {
-      const pollInterval = setInterval(() => {
-        if (checkForData()) {
-          clearInterval(pollInterval);
-        }
-      }, 100);
-      
-      // Clear after 10 seconds
-      setTimeout(() => clearInterval(pollInterval), 10000);
-    }
+    window.addEventListener('analysisCompleted', handleAnalysisComplete);
 
     return () => {
       window.removeEventListener('salesTrendUpdate', handleSalesTrendUpdate as EventListener);
+      window.removeEventListener('analysisCompleted', handleAnalysisComplete);
     };
   }, []);
 

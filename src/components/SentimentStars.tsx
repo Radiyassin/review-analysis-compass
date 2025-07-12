@@ -14,7 +14,7 @@ const SentimentStars = () => {
 
     // Function to update sentiment data
     const updateSentimentData = (sentimentScore: number) => {
-      console.log('Updating sentiment data with score:', sentimentScore);
+      console.log('SentimentStars: Updating sentiment data with score:', sentimentScore);
       const clampedScore = Math.max(-1, Math.min(1, sentimentScore));
       const scoreOutOf5 = ((clampedScore + 1) / 2) * 5;
       
@@ -22,43 +22,38 @@ const SentimentStars = () => {
         score: sentimentScore,
         rating: scoreOutOf5
       });
+      console.log('SentimentStars: Data updated to:', { score: sentimentScore, rating: scoreOutOf5 });
     };
 
     // Listen for sentiment data updates from main.js
     const handleSentimentUpdate = (event: CustomEvent) => {
-      console.log('SentimentStars received event:', event.detail);
+      console.log('SentimentStars: Received sentimentDataUpdate event:', event.detail);
       const { sentimentScore } = event.detail;
-      updateSentimentData(sentimentScore);
+      if (typeof sentimentScore === 'number') {
+        updateSentimentData(sentimentScore);
+      }
     };
 
     // Add event listener
     window.addEventListener('sentimentDataUpdate', handleSentimentUpdate as EventListener);
     
-    // Check if window has the data already
-    const checkForData = () => {
-      if (typeof window !== 'undefined' && (window as any).currentSentimentScore !== undefined) {
-        const sentimentScore = (window as any).currentSentimentScore;
-        console.log('SentimentStars found existing data:', sentimentScore);
-        updateSentimentData(sentimentScore);
-        return true;
-      }
-      return false;
+    // Also listen for analysis completion to check for data
+    const handleAnalysisComplete = () => {
+      console.log('SentimentStars: Analysis completed, checking for data...');
+      setTimeout(() => {
+        if (typeof window !== 'undefined' && (window as any).currentSentimentScore !== undefined) {
+          const sentimentScore = (window as any).currentSentimentScore;
+          console.log('SentimentStars: Found sentiment score after analysis:', sentimentScore);
+          updateSentimentData(sentimentScore);
+        }
+      }, 500); // Small delay to ensure data is set
     };
 
-    // Check immediately and set up polling
-    if (!checkForData()) {
-      const pollInterval = setInterval(() => {
-        if (checkForData()) {
-          clearInterval(pollInterval);
-        }
-      }, 100);
-      
-      // Clear after 10 seconds
-      setTimeout(() => clearInterval(pollInterval), 10000);
-    }
+    window.addEventListener('analysisCompleted', handleAnalysisComplete);
 
     return () => {
       window.removeEventListener('sentimentDataUpdate', handleSentimentUpdate as EventListener);
+      window.removeEventListener('analysisCompleted', handleAnalysisComplete);
     };
   }, []);
 
