@@ -13,105 +13,110 @@ import traceback
 
 main_bp = Blueprint('main', __name__)
 
-# Health check endpoint
-@main_bp.route('/api/health', methods=['GET'])
-def health_check():
-    print("🏥 Health check endpoint called")
-    return jsonify({
-        "status": "healthy",
-        "message": "Flask API Backend is running!",
-        "timestamp": datetime.now().isoformat(),
-        "endpoints": [
-            "GET /api/health - Health check",
-            "POST /api/upload - File upload and analysis", 
-            "POST /api/chat - Chatbot functionality"
-        ]
-    })
+# Serve React app
+@main_bp.route('/')
+def serve_index():
+    try:
+        dist_path = current_app.static_folder
+        index_path = os.path.join(dist_path, 'index.html')
+        
+        print(f"Trying to serve index.html from: {index_path}")
+        print(f"File exists: {os.path.exists(index_path)}")
+        
+        if os.path.exists(index_path):
+            return send_from_directory(dist_path, 'index.html')
+        else:
+            return """
+            <h1>React Build Not Found</h1>
+            <p>Please run the following commands to build the React app:</p>
+            <pre>
+npm install
+npm run build
+            </pre>
+            <p>Then restart the Flask server with: <code>python main.py</code></p>
+            """, 404
+    except Exception as e:
+        print(f"Error serving index: {str(e)}")
+        return f"Error: {str(e)}", 500
 
-# Root endpoint for API info
-@main_bp.route('/', methods=['GET'])
-@main_bp.route('/api', methods=['GET'])
-def api_info():
-    print("📋 API info endpoint called")
-    return jsonify({
-        "message": "Flask API Backend - Review Analysis Service",
-        "version": "1.0.0",
-        "endpoints": {
-            "health": "GET /api/health",
-            "upload": "POST /api/upload",
-            "chat": "POST /api/chat"
-        },
-        "status": "running"
-    })
+@main_bp.route('/<path:path>')
+def serve_static(path):
+    try:
+        dist_path = current_app.static_folder
+        file_path = os.path.join(dist_path, path)
+        
+        print(f"Trying to serve static file: {file_path}")
+        
+        if os.path.exists(file_path):
+            return send_from_directory(dist_path, path)
+        else:
+            # If file doesn't exist, serve index.html for React routing
+            return serve_index()
+    except Exception as e:
+        print(f"Error serving static file {path}: {str(e)}")
+        return serve_index()
 
 # API Routes
-@main_bp.route('/api/upload', methods=['POST', 'OPTIONS'])
+@main_bp.route('/api/upload', methods=['POST'])
 def upload_file():
-    # Handle CORS preflight
-    if request.method == 'OPTIONS':
-        return '', 200
-        
     try:
-        print("\n" + "="*60)
-        print("📤 UPLOAD ENDPOINT CALLED")
-        print("="*60)
-        print(f"🔍 Request method: {request.method}")
-        print(f"🔍 Content type: {request.content_type}")
-        print(f"🔍 Files in request: {list(request.files.keys())}")
+        print("\n" + "="*50)
+        print("UPLOAD ENDPOINT CALLED")
+        print("="*50)
         
         # Check if file is in request
         if 'file' not in request.files:
-            print("❌ ERROR: No file in request.files")
+            print("ERROR: No file in request.files")
             print("Available keys:", list(request.files.keys()))
             return jsonify({"error": "No file uploaded", "success": False}), 400
 
         file = request.files['file']
         if not file or file.filename == '':
-            print("❌ ERROR: Empty filename or no file")
+            print("ERROR: Empty filename or no file")
             return jsonify({"error": "No selected file", "success": False}), 400
 
-        print(f"📄 Processing file: {file.filename}")
-        print(f"📦 File size: {file.content_length if hasattr(file, 'content_length') else 'Unknown'}")
+        print(f"Processing file: {file.filename}")
+        print(f"File size: {file.content_length if hasattr(file, 'content_length') else 'Unknown'}")
 
         # Ensure uploads directory exists
         uploads_dir = 'uploads'
         if not os.path.exists(uploads_dir):
             os.makedirs(uploads_dir)
-            print(f"📁 Created uploads directory: {uploads_dir}")
+            print(f"Created uploads directory: {uploads_dir}")
 
         # Save file with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"{timestamp}_{file.filename}"
         file_path = os.path.join(uploads_dir, filename)
         
-        print(f"💾 Saving file to: {file_path}")
+        print(f"Saving file to: {file_path}")
         file.save(file_path)
         
         if not os.path.exists(file_path):
-            print("❌ ERROR: File was not saved properly")
+            print("ERROR: File was not saved properly")
             return jsonify({"error": "Failed to save file", "success": False}), 500
             
-        print(f"✅ File saved successfully. Size: {os.path.getsize(file_path)} bytes")
+        print(f"File saved successfully. Size: {os.path.getsize(file_path)} bytes")
 
         # Read and validate CSV
         try:
-            print("📊 Reading CSV file...")
+            print("Reading CSV file...")
             df = pd.read_csv(file_path, encoding='utf-8')
-            print(f"✅ CSV loaded: {len(df)} rows, {len(df.columns)} columns")
-            print(f"📋 Columns: {list(df.columns)}")
-            print(f"👀 First few rows preview:")
+            print(f"CSV loaded: {len(df)} rows, {len(df.columns)} columns")
+            print(f"Columns: {list(df.columns)}")
+            print(f"First few rows preview:")
             print(df.head().to_string())
             
         except UnicodeDecodeError:
             try:
-                print("🔄 UTF-8 failed, trying latin-1 encoding...")
+                print("UTF-8 failed, trying latin-1 encoding...")
                 df = pd.read_csv(file_path, encoding='latin-1')
-                print(f"✅ CSV loaded with latin-1: {len(df)} rows, {len(df.columns)} columns")
+                print(f"CSV loaded with latin-1: {len(df)} rows, {len(df.columns)} columns")
             except Exception as e:
-                print(f"❌ ERROR reading CSV with latin-1: {str(e)}")
+                print(f"ERROR reading CSV with latin-1: {str(e)}")
                 return jsonify({"error": f"Failed to read CSV file: {str(e)}", "success": False}), 400
         except Exception as e:
-            print(f"❌ ERROR reading CSV: {str(e)}")
+            print(f"ERROR reading CSV: {str(e)}")
             return jsonify({"error": f"Failed to read CSV: {str(e)}", "success": False}), 400
 
         # Check for required columns
@@ -119,12 +124,12 @@ def upload_file():
         missing_cols = [col for col in required_columns if col not in df.columns]
         
         if missing_cols:
-            print(f"❌ Missing required columns: {missing_cols}")
-            print(f"📋 Available columns: {list(df.columns)}")
+            print(f"Missing required columns: {missing_cols}")
+            print(f"Available columns: {list(df.columns)}")
             # Try to find similar column names
             potential_review_cols = [col for col in df.columns if 'review' in col.lower() or 'comment' in col.lower() or 'feedback' in col.lower()]
             if potential_review_cols:
-                print(f"🔍 Potential review columns found: {potential_review_cols}")
+                print(f"Potential review columns found: {potential_review_cols}")
                 return jsonify({
                     "error": f"Missing 'Reviews' column. Found potential columns: {', '.join(potential_review_cols)}",
                     "available_columns": list(df.columns),
@@ -138,7 +143,7 @@ def upload_file():
                 }), 400
 
         # Clean the data
-        print("🧹 Cleaning data...")
+        print("Cleaning data...")
         original_count = len(df)
         
         # Handle missing values in Reviews column
@@ -147,18 +152,18 @@ def upload_file():
         df = df[df['Reviews'].astype(str) != 'nan']
         
         cleaned_count = len(df)
-        print(f"✅ Data cleaned: {cleaned_count} rows remaining (from {original_count})")
+        print(f"Data cleaned: {cleaned_count} rows remaining (from {original_count})")
 
         if cleaned_count == 0:
             return jsonify({"error": "No valid reviews found after cleaning", "success": False}), 400
 
         # Perform sentiment analysis
-        print("🔍 Starting sentiment analysis...")
+        print("Starting sentiment analysis...")
         from app.utils.nlp_processor import analyze_sentiment
         
         df = analyze_sentiment(df, 'Reviews')
-        print("✅ Sentiment analysis completed")
-        print("📊 Sentiment distribution:", df['sentiment'].value_counts().to_dict())
+        print("Sentiment analysis completed")
+        print(df['sentiment'].value_counts().to_dict())
 
         # Extract product information
         print("Extracting product information...")
@@ -288,40 +293,31 @@ def upload_file():
         except Exception as e:
             print(f"Warning: Could not store context for chatbot: {str(e)}")
 
-        print("="*60)
-        print("🎉 ANALYSIS COMPLETED SUCCESSFULLY")
-        print(f"📦 Response keys: {list(response_data.keys())}")
-        print("="*60)
+        print("="*50)
+        print("ANALYSIS COMPLETED SUCCESSFULLY")
+        print(f"Response keys: {list(response_data.keys())}")
+        print("="*50)
         
         return jsonify(response_data)
 
     except Exception as e:
-        print(f"\n{'='*60}")
-        print("💥 CRITICAL ERROR IN UPLOAD ENDPOINT")
-        print(f"{'='*60}")
-        print(f"❌ Error: {str(e)}")
-        print("🔍 Full traceback:")
+        print(f"\n{'='*50}")
+        print("CRITICAL ERROR IN UPLOAD ENDPOINT")
+        print(f"{'='*50}")
+        print(f"Error: {str(e)}")
+        print("Full traceback:")
         traceback.print_exc()
-        print(f"{'='*60}")
+        print(f"{'='*50}")
         
         return jsonify({
             "error": f"Internal server error: {str(e)}",
             "success": False
         }), 500
 
-@main_bp.route('/api/chat', methods=['POST', 'OPTIONS'])
+@main_bp.route('/api/chat', methods=['POST'])
 def chat():
-    # Handle CORS preflight
-    if request.method == 'OPTIONS':
-        return '', 200
-        
     try:
-        print("\n" + "="*50)
-        print("💬 CHAT ENDPOINT CALLED")
-        print("="*50)
-        
         if not current_app.config.get('OPENAI_API_KEY'):
-            print("❌ OpenAI API key not configured")
             return jsonify({'answer': "OpenAI API key not configured. Please set OPENAI_API_KEY environment variable."})
 
         client = openai.OpenAI(api_key=current_app.config['OPENAI_API_KEY'])
@@ -329,12 +325,8 @@ def chat():
         question = request.json.get('question', '')
         context = session.get('reviews_text', '')
         product_info = session.get('product_info', {})
-        
-        print(f"❓ Question: {question}")
-        print(f"📝 Context available: {'Yes' if context else 'No'}")
 
         if not context:
-            print("❌ No context available")
             return jsonify({'answer': "Please upload a product review file first to enable chat functionality."})
 
         prompt = f"""You are a helpful assistant analyzing customer reviews for this product:
@@ -351,7 +343,6 @@ Question: {question}
 
 Please provide a helpful answer based on the reviews and product information."""
 
-        print("🤖 Sending request to OpenAI...")
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
@@ -363,11 +354,8 @@ Please provide a helpful answer based on the reviews and product information."""
         )
         
         answer = response.choices[0].message.content
-        print(f"✅ OpenAI Response: {answer[:100]}...")
-        print("="*50)
         return jsonify({'answer': answer})
         
     except Exception as e:
-        print(f"❌ Chat error: {str(e)}")
-        traceback.print_exc()
+        print(f"Chat error: {str(e)}")
         return jsonify({'answer': f"Sorry, there was an error processing your question: {str(e)}"})
