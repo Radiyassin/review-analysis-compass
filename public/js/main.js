@@ -39,7 +39,6 @@ window.analyze = async function() {
         });
 
         console.log('Response status:', response.status);
-        console.log('Response headers:', response.headers);
         
         if (!response.ok) {
             const errorText = await response.text();
@@ -47,29 +46,16 @@ window.analyze = async function() {
             throw new Error(`Server error: ${response.status} - ${errorText}`);
         }
 
-        // Get the raw response text first
-        const responseText = await response.text();
-        console.log('Raw response text:', responseText);
-        
-        // Parse JSON
-        let data;
-        try {
-            data = JSON.parse(responseText);
-        } catch (parseError) {
-            console.error('JSON Parse Error:', parseError);
-            console.error('Response was not valid JSON:', responseText);
-            throw new Error('Invalid JSON response from server');
-        }
-
+        // Get the response data
+        const data = await response.json();
         console.log('=== RECEIVED DATA FROM BACKEND ===');
-        console.log('Full parsed response:', JSON.stringify(data, null, 2));
+        console.log('Full response:', data);
 
         if (!data.success && !data.chart_data) {
-            console.error('Invalid response format:', data);
             throw new Error('Invalid response from server');
         }
 
-        // Store data globally for React components - with detailed logging
+        // Store data globally IMMEDIATELY
         console.log('=== STORING GLOBAL DATA ===');
         window.currentSentimentScore = data.sentiment_score || 0;
         window.currentSalesTrend = data.sales_trend || { trend: 'Stable', avg_sentiment: 0, message: 'No data' };
@@ -77,12 +63,9 @@ window.analyze = async function() {
         window.currentChartData = data.chart_data || {};
         window.currentPhrases = data.common_phrases || [];
 
-        console.log('=== GLOBAL DATA STORED ===');
-        console.log('window.currentSentimentScore:', window.currentSentimentScore);
-        console.log('window.currentSalesTrend:', window.currentSalesTrend);
-        console.log('window.currentProductInfo:', window.currentProductInfo);
-        console.log('window.currentChartData:', window.currentChartData);
-        console.log('window.currentPhrases:', window.currentPhrases);
+        console.log('Stored sentiment score:', window.currentSentimentScore);
+        console.log('Stored sales trend:', window.currentSalesTrend);
+        console.log('Stored product info:', window.currentProductInfo);
 
         // Update DOM-based UI components first
         updateProductInfo(data.product_info || {});
@@ -92,37 +75,37 @@ window.analyze = async function() {
             updateCharts(data.chart_data);
         }
 
-        // Dispatch events to React components with more detailed logging
-        console.log('=== DISPATCHING EVENTS TO REACT ===');
-        
-        // Update sentiment stars component
-        const sentimentEventData = { sentimentScore: data.sentiment_score || 0 };
-        console.log('Dispatching sentimentDataUpdate with:', sentimentEventData);
-        const sentimentEvent = new CustomEvent('sentimentDataUpdate', {
-            detail: sentimentEventData
-        });
-        window.dispatchEvent(sentimentEvent);
+        // Wait a moment to ensure React components are ready, then dispatch events
+        setTimeout(() => {
+            console.log('=== DISPATCHING EVENTS TO REACT ===');
+            
+            // Dispatch sentiment data event
+            console.log('Dispatching sentiment event with score:', data.sentiment_score);
+            const sentimentEvent = new CustomEvent('sentimentDataUpdate', {
+                detail: { sentimentScore: data.sentiment_score || 0 }
+            });
+            window.dispatchEvent(sentimentEvent);
 
-        // Update sales forecast component
-        const salesEventData = data.sales_trend || { trend: 'Stable', avg_sentiment: 0, message: 'No data' };
-        console.log('Dispatching salesTrendUpdate with:', salesEventData);
-        const salesEvent = new CustomEvent('salesTrendUpdate', {
-            detail: salesEventData
-        });
-        window.dispatchEvent(salesEvent);
-        
-        // Dispatch analysis completion event to show results in UI
-        console.log('Dispatching analysisCompleted event');
-        const completionEvent = new CustomEvent('analysisCompleted');
-        window.dispatchEvent(completionEvent);
+            // Dispatch sales trend event
+            console.log('Dispatching sales trend event with data:', data.sales_trend);
+            const salesEvent = new CustomEvent('salesTrendUpdate', {
+                detail: data.sales_trend || { trend: 'Stable', avg_sentiment: 0, message: 'No data' }
+            });
+            window.dispatchEvent(salesEvent);
+            
+            // Finally dispatch completion event
+            console.log('Dispatching analysis completed event');
+            const completionEvent = new CustomEvent('analysisCompleted');
+            window.dispatchEvent(completionEvent);
 
-        console.log('=== ALL EVENTS DISPATCHED ===');
-        console.log('=== ANALYSIS COMPLETED ===');
+            console.log('=== ALL EVENTS DISPATCHED ===');
+        }, 500); // Give React components time to mount and be ready
+
+        console.log('=== ANALYSIS PROCESS COMPLETED ===');
         
     } catch (error) {
         console.error('=== FETCH ERROR ===');
         console.error('Error details:', error);
-        console.error('Error stack:', error.stack);
         alert(`Analysis failed: ${error.message}`);
     } finally {
         // Reset button state

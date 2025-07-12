@@ -17,45 +17,44 @@ const SalesForecast = () => {
 
     // Function to update trend data
     const updateTrendData = (data: SalesTrendData) => {
-      console.log('📈 SalesForecast: Updating trend data:', data);
+      console.log('📈 SalesForecast: Updating with data:', data);
       setTrendData(data);
     };
 
-    // Listen for sales trend updates from main.js
+    // Listen for sales trend updates
     const handleSalesTrendUpdate = (event: CustomEvent) => {
-      console.log('📈 SalesForecast: Received salesTrendUpdate event:', event.detail);
+      console.log('📈 SalesForecast: Received event:', event.detail);
       if (event.detail && typeof event.detail === 'object') {
         updateTrendData(event.detail);
-      } else {
-        console.warn('📈 SalesForecast: Invalid trend data received:', event.detail);
       }
     };
 
-    // Add event listener
-    window.addEventListener('salesTrendUpdate', handleSalesTrendUpdate as EventListener);
-    console.log('📈 SalesForecast: Event listener added for salesTrendUpdate');
-    
-    // Also listen for analysis completion to check for data
-    const handleAnalysisComplete = () => {
-      console.log('📈 SalesForecast: Analysis completed, checking for global data...');
-      setTimeout(() => {
-        if (typeof window !== 'undefined' && (window as any).currentSalesTrend) {
-          const salesTrend = (window as any).currentSalesTrend;
-          console.log('📈 SalesForecast: Found sales trend in global data:', salesTrend);
-          updateTrendData(salesTrend);
-        } else {
-          console.warn('📈 SalesForecast: No sales trend found in global data');
-        }
-      }, 1000); // Longer delay to ensure data is set
+    // Check for existing global data
+    const checkGlobalData = () => {
+      console.log('📈 SalesForecast: Checking global data...');
+      if (typeof window !== 'undefined' && (window as any).currentSalesTrend) {
+        const salesTrend = (window as any).currentSalesTrend;
+        console.log('📈 SalesForecast: Found global sales trend:', salesTrend);
+        updateTrendData(salesTrend);
+        return true;
+      }
+      return false;
     };
 
-    window.addEventListener('analysisCompleted', handleAnalysisComplete);
-    console.log('📈 SalesForecast: Event listener added for analysisCompleted');
+    // Try to get existing data immediately
+    if (!checkGlobalData()) {
+      console.log('📈 SalesForecast: No existing data, waiting for events...');
+    }
+
+    // Add event listeners
+    window.addEventListener('salesTrendUpdate', handleSalesTrendUpdate as EventListener);
+    window.addEventListener('analysisCompleted', () => {
+      console.log('📈 SalesForecast: Analysis completed, checking for data...');
+      setTimeout(() => checkGlobalData(), 100);
+    });
 
     return () => {
-      console.log('📈 SalesForecast: Removing event listeners');
       window.removeEventListener('salesTrendUpdate', handleSalesTrendUpdate as EventListener);
-      window.removeEventListener('analysisCompleted', handleAnalysisComplete);
     };
   }, []);
 
@@ -89,12 +88,7 @@ const SalesForecast = () => {
     }
   };
 
-  const getExplanation = () => {
-    if (!trendData) return "Loading forecast data...";
-    return trendData.message || "Analysis complete.";
-  };
-
-  console.log('📈 SalesForecast: Rendering with data:', trendData);
+  console.log('📈 SalesForecast: Current data:', trendData);
 
   return (
     <Card className="shadow-lg border-0 bg-gradient-to-r from-green-50 to-blue-50">
@@ -109,7 +103,9 @@ const SalesForecast = () => {
               {trendData?.trend || 'Loading...'}
             </span>
             <span className="text-gray-600">—</span>
-            <span className="text-gray-600">{getExplanation()}</span>
+            <span className="text-gray-600">
+              {trendData?.message || "Loading forecast data..."}
+            </span>
           </div>
           {trendData && (
             <p className="text-sm text-gray-500 mt-2">
