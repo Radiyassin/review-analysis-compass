@@ -30,7 +30,7 @@ const SalesForecast = () => {
     // Add event listener
     window.addEventListener('salesTrendUpdate', handleSalesTrendUpdate as EventListener);
     
-    // Check if window has the data already and poll for it
+    // Check if window has the data already
     const checkForData = () => {
       if (typeof window !== 'undefined' && (window as any).currentSalesTrend) {
         const salesTrend = (window as any).currentSalesTrend;
@@ -41,16 +41,16 @@ const SalesForecast = () => {
       return false;
     };
 
-    // Check immediately
+    // Check immediately and set up polling
     if (!checkForData()) {
-      // If no data yet, poll every 500ms for up to 10 seconds
-      let pollCount = 0;
       const pollInterval = setInterval(() => {
-        pollCount++;
-        if (checkForData() || pollCount > 20) {
+        if (checkForData()) {
           clearInterval(pollInterval);
         }
-      }, 500);
+      }, 100);
+      
+      // Clear after 10 seconds
+      setTimeout(() => clearInterval(pollInterval), 10000);
     }
 
     return () => {

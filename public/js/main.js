@@ -56,7 +56,7 @@ window.analyze = async function() {
             return;
         }
 
-        // Store data globally for React components FIRST
+        // Store data globally for React components
         window.currentSentimentScore = data.sentiment_score || 0;
         window.currentSalesTrend = data.sales_trend || { trend: 'Stable', avg_sentiment: 0, message: 'No data' };
         window.currentProductInfo = data.product_info || { 'Product Name': 'N/A', 'Brand Name': 'N/A', 'Price': 'N/A' };
@@ -69,7 +69,7 @@ window.analyze = async function() {
         console.log('Product Info:', window.currentProductInfo);
         console.log('Chart Data:', window.currentChartData);
 
-        // Update DOM-based UI components
+        // Update DOM-based UI components first
         updateProductInfo(data.product_info || {});
         updatePhrases(data.common_phrases || []);
         
@@ -77,47 +77,27 @@ window.analyze = async function() {
             updateCharts(data.chart_data);
         }
 
-        // Wait a bit then dispatch events for React components
-        setTimeout(() => {
-            console.log('=== DISPATCHING EVENTS TO REACT ===');
-            
-            // Update sentiment stars component
-            const sentimentEvent = new CustomEvent('sentimentDataUpdate', {
-                detail: { sentimentScore: data.sentiment_score || 0 }
-            });
-            window.dispatchEvent(sentimentEvent);
-            console.log('Dispatched sentimentDataUpdate event with score:', data.sentiment_score);
-
-            // Update sales forecast component
-            const salesEvent = new CustomEvent('salesTrendUpdate', {
-                detail: data.sales_trend || { trend: 'Stable', avg_sentiment: 0, message: 'No data' }
-            });
-            window.dispatchEvent(salesEvent);
-            console.log('Dispatched salesTrendUpdate event with trend:', data.sales_trend);
-            
-            // Dispatch analysis completion event to show results in UI
-            const completionEvent = new CustomEvent('analysisCompleted');
-            window.dispatchEvent(completionEvent);
-            console.log('Dispatched analysisCompleted event');
-            
-        }, 200);
-
-        // Also dispatch events immediately (double dispatch for reliability)
-        console.log('=== DISPATCHING IMMEDIATE EVENTS ===');
+        // Dispatch events for React components with actual data
+        console.log('=== DISPATCHING EVENTS TO REACT ===');
         
-        const immediateEvent1 = new CustomEvent('sentimentDataUpdate', {
+        // Update sentiment stars component
+        const sentimentEvent = new CustomEvent('sentimentDataUpdate', {
             detail: { sentimentScore: data.sentiment_score || 0 }
         });
-        window.dispatchEvent(immediateEvent1);
+        window.dispatchEvent(sentimentEvent);
+        console.log('Dispatched sentimentDataUpdate event with score:', data.sentiment_score);
 
-        const immediateEvent2 = new CustomEvent('salesTrendUpdate', {
+        // Update sales forecast component
+        const salesEvent = new CustomEvent('salesTrendUpdate', {
             detail: data.sales_trend || { trend: 'Stable', avg_sentiment: 0, message: 'No data' }
         });
-        window.dispatchEvent(immediateEvent2);
-
-        // Dispatch completion event immediately as well
-        const immediateCompletionEvent = new CustomEvent('analysisCompleted');
-        window.dispatchEvent(immediateCompletionEvent);
+        window.dispatchEvent(salesEvent);
+        console.log('Dispatched salesTrendUpdate event with trend:', data.sales_trend);
+        
+        // Dispatch analysis completion event to show results in UI
+        const completionEvent = new CustomEvent('analysisCompleted');
+        window.dispatchEvent(completionEvent);
+        console.log('Dispatched analysisCompleted event');
 
         console.log('=== ANALYSIS COMPLETED ===');
         
