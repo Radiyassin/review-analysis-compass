@@ -13,18 +13,44 @@ const SalesForecast = () => {
   const [trendData, setTrendData] = useState<SalesTrendData | null>(null);
 
   useEffect(() => {
-    // Listen for sales trend updates from main.js
-    const handleSalesTrendUpdate = (event: CustomEvent) => {
-      console.log('SalesForecast received update:', event.detail);
-      setTrendData(event.detail);
+    console.log('SalesForecast component mounted');
+
+    // Function to update trend data
+    const updateTrendData = (data: SalesTrendData) => {
+      console.log('Updating trend data:', data);
+      setTrendData(data);
     };
 
+    // Listen for sales trend updates from main.js
+    const handleSalesTrendUpdate = (event: CustomEvent) => {
+      console.log('SalesForecast received event:', event.detail);
+      updateTrendData(event.detail);
+    };
+
+    // Add event listener
     window.addEventListener('salesTrendUpdate', handleSalesTrendUpdate as EventListener);
     
-    // Also check if window has the data already
-    if (typeof window !== 'undefined' && (window as any).currentSalesTrend) {
-      console.log('SalesForecast found existing data:', (window as any).currentSalesTrend);
-      setTrendData((window as any).currentSalesTrend);
+    // Check if window has the data already and poll for it
+    const checkForData = () => {
+      if (typeof window !== 'undefined' && (window as any).currentSalesTrend) {
+        const salesTrend = (window as any).currentSalesTrend;
+        console.log('SalesForecast found existing data:', salesTrend);
+        updateTrendData(salesTrend);
+        return true;
+      }
+      return false;
+    };
+
+    // Check immediately
+    if (!checkForData()) {
+      // If no data yet, poll every 500ms for up to 10 seconds
+      let pollCount = 0;
+      const pollInterval = setInterval(() => {
+        pollCount++;
+        if (checkForData() || pollCount > 20) {
+          clearInterval(pollInterval);
+        }
+      }, 500);
     }
 
     return () => {
@@ -64,17 +90,7 @@ const SalesForecast = () => {
 
   const getExplanation = () => {
     if (!trendData) return "Loading forecast data...";
-    
-    switch (trendData.trend) {
-      case 'Up':
-        return "Customers are mostly satisfied, so the product is likely to sell well.";
-      case 'Down':
-        return "Many customers are unhappy, which may reduce future sales.";
-      case 'Stable':
-        return "Customer opinions are mixed, so sales are expected to stay the same.";
-      default:
-        return trendData.message || "Analysis complete.";
-    }
+    return trendData.message || "Analysis complete.";
   };
 
   return (
@@ -92,6 +108,11 @@ const SalesForecast = () => {
             <span className="text-gray-600">—</span>
             <span className="text-gray-600">{getExplanation()}</span>
           </div>
+          {trendData && (
+            <p className="text-sm text-gray-500 mt-2">
+              Average sentiment: {trendData.avg_sentiment.toFixed(3)}
+            </p>
+          )}
         </div>
       </CardContent>
     </Card>

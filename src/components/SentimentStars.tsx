@@ -10,10 +10,11 @@ const SentimentStars = () => {
   });
 
   useEffect(() => {
-    // Listen for sentiment data updates from main.js
-    const handleSentimentUpdate = (event: CustomEvent) => {
-      console.log('SentimentStars received update:', event.detail);
-      const { sentimentScore } = event.detail;
+    console.log('SentimentStars component mounted');
+
+    // Function to update sentiment data
+    const updateSentimentData = (sentimentScore: number) => {
+      console.log('Updating sentiment data with score:', sentimentScore);
       const clampedScore = Math.max(-1, Math.min(1, sentimentScore));
       const scoreOutOf5 = ((clampedScore + 1) / 2) * 5;
       
@@ -23,19 +24,37 @@ const SentimentStars = () => {
       });
     };
 
+    // Listen for sentiment data updates from main.js
+    const handleSentimentUpdate = (event: CustomEvent) => {
+      console.log('SentimentStars received event:', event.detail);
+      const { sentimentScore } = event.detail;
+      updateSentimentData(sentimentScore);
+    };
+
+    // Add event listener
     window.addEventListener('sentimentDataUpdate', handleSentimentUpdate as EventListener);
     
-    // Also check if window has the data already
-    if (typeof window !== 'undefined' && (window as any).currentSentimentScore !== undefined) {
-      const sentimentScore = (window as any).currentSentimentScore;
-      console.log('SentimentStars found existing data:', sentimentScore);
-      const clampedScore = Math.max(-1, Math.min(1, sentimentScore));
-      const scoreOutOf5 = ((clampedScore + 1) / 2) * 5;
-      
-      setSentimentData({
-        score: sentimentScore,
-        rating: scoreOutOf5
-      });
+    // Check if window has the data already and poll for it
+    const checkForData = () => {
+      if (typeof window !== 'undefined' && (window as any).currentSentimentScore !== undefined) {
+        const sentimentScore = (window as any).currentSentimentScore;
+        console.log('SentimentStars found existing data:', sentimentScore);
+        updateSentimentData(sentimentScore);
+        return true;
+      }
+      return false;
+    };
+
+    // Check immediately
+    if (!checkForData()) {
+      // If no data yet, poll every 500ms for up to 10 seconds
+      let pollCount = 0;
+      const pollInterval = setInterval(() => {
+        pollCount++;
+        if (checkForData() || pollCount > 20) {
+          clearInterval(pollInterval);
+        }
+      }, 500);
     }
 
     return () => {
@@ -78,6 +97,11 @@ const SentimentStars = () => {
             <span className="text-lg font-bold text-gray-700">
               ({sentimentData.rating.toFixed(1)}/5)
             </span>
+            {sentimentData.score !== 0 && (
+              <p className="text-sm text-gray-600">
+                Raw sentiment score: {sentimentData.score.toFixed(3)}
+              </p>
+            )}
           </div>
           <p className="text-sm text-gray-600 mt-2">Based on sentiment analysis of customer reviews</p>
         </div>

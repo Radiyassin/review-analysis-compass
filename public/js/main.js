@@ -1,4 +1,3 @@
-
 let sentimentChart, distributionChart, countChart;
 
 window.addEventListener('load', () => {
@@ -40,7 +39,6 @@ window.analyze = async function() {
         });
 
         console.log('Response status:', response.status);
-        console.log('Response headers:', response.headers);
         
         if (!response.ok) {
             const errorText = await response.text();
@@ -58,7 +56,7 @@ window.analyze = async function() {
             return;
         }
 
-        // Store data globally for React components
+        // Store data globally for React components FIRST
         window.currentSentimentScore = data.sentiment_score || 0;
         window.currentSalesTrend = data.sales_trend || { trend: 'Stable', avg_sentiment: 0, message: 'No data' };
         window.currentProductInfo = data.product_info || { 'Product Name': 'N/A', 'Brand Name': 'N/A', 'Price': 'N/A' };
@@ -71,7 +69,7 @@ window.analyze = async function() {
         console.log('Product Info:', window.currentProductInfo);
         console.log('Chart Data:', window.currentChartData);
 
-        // Update UI components immediately
+        // Update DOM-based UI components
         updateProductInfo(data.product_info || {});
         updatePhrases(data.common_phrases || []);
         
@@ -79,7 +77,7 @@ window.analyze = async function() {
             updateCharts(data.chart_data);
         }
 
-        // Dispatch events for React components
+        // Wait a bit then dispatch events for React components
         setTimeout(() => {
             console.log('=== DISPATCHING EVENTS TO REACT ===');
             
@@ -97,7 +95,20 @@ window.analyze = async function() {
             window.dispatchEvent(salesEvent);
             console.log('Dispatched salesTrendUpdate event with trend:', data.sales_trend);
             
-        }, 100);
+        }, 200);
+
+        // Also dispatch events immediately (double dispatch for reliability)
+        console.log('=== DISPATCHING IMMEDIATE EVENTS ===');
+        
+        const immediateEvent1 = new CustomEvent('sentimentDataUpdate', {
+            detail: { sentimentScore: data.sentiment_score || 0 }
+        });
+        window.dispatchEvent(immediateEvent1);
+
+        const immediateEvent2 = new CustomEvent('salesTrendUpdate', {
+            detail: data.sales_trend || { trend: 'Stable', avg_sentiment: 0, message: 'No data' }
+        });
+        window.dispatchEvent(immediateEvent2);
 
         alert('Analysis completed successfully! Check the results below.');
         console.log('=== ANALYSIS COMPLETED ===');
