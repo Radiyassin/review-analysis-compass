@@ -9,8 +9,9 @@ window.addEventListener('load', () => {
 });
 
 async function analyze() {
-    const fileInput = document.getElementById('csvFile');
-    if (!fileInput.files[0]) {
+    // Get file from React component instead of DOM element
+    const file = (window as any).selectedCsvFile;
+    if (!file) {
         alert('Please select a CSV file');
         return;
     }
@@ -24,7 +25,7 @@ async function analyze() {
 
     try {
         const formData = new FormData();
-        formData.append('file', fileInput.files[0]);
+        formData.append('file', file);
 
         const response = await fetch('/api/upload', {
             method: 'POST',
@@ -40,7 +41,10 @@ async function analyze() {
         const data = await response.json();
         console.log('Analysis data received:', data);
 
-        document.getElementById('results').style.display = 'block';
+        const resultsElement = document.getElementById('results');
+        if (resultsElement) {
+            resultsElement.style.display = 'block';
+        }
 
         setTimeout(() => {
             renderSentimentStars(data.sentiment_score);
@@ -90,7 +94,7 @@ function renderCharts(data) {
     const distributionChartEl = document.getElementById('distributionChart');
     const countChartEl = document.getElementById('countChart');
 
-    if (sentimentChartEl) {
+    if (sentimentChartEl && typeof Chart !== 'undefined') {
         const sc = sentimentChartEl.getContext('2d');
         sentimentChart = new Chart(sc, {
             type: 'bar',
@@ -111,7 +115,7 @@ function renderCharts(data) {
         });
     }
 
-    if (distributionChartEl) {
+    if (distributionChartEl && typeof Chart !== 'undefined') {
         const dc = distributionChartEl.getContext('2d');
         distributionChart = new Chart(dc, {
             type: 'pie',
@@ -125,7 +129,7 @@ function renderCharts(data) {
         });
     }
 
-    if (countChartEl) {
+    if (countChartEl && typeof Chart !== 'undefined') {
         const cc = countChartEl.getContext('2d');
         countChart = new Chart(cc, {
             type: 'bar',
@@ -158,7 +162,7 @@ function renderPhrases(phrases) {
 
 function renderWordCloud(phrases) {
     const container = document.getElementById('wordCloud');
-    if (!container) return;
+    if (!container || typeof d3 === 'undefined') return;
     
     container.innerHTML = '';
 
@@ -171,6 +175,11 @@ function renderWordCloud(phrases) {
         text: p[0],
         size: 10 + p[1] * 3
     }));
+
+    if (typeof d3.layout === 'undefined' || typeof d3.layout.cloud === 'undefined') {
+        container.innerHTML = '<p>Word cloud library not available</p>';
+        return;
+    }
 
     const layout = d3.layout.cloud()
         .size([container.clientWidth, 400])
@@ -207,7 +216,6 @@ function renderRatingStats(stats) {
 
 function renderSentimentStars(sentimentScore) {
     const container = document.getElementById('sentimentStars');
-    console.log("Calling renderSentimentStars. Found container?", !!container);
     if (!container) {
         console.error("Element with ID 'sentimentStars' not found.");
         return;
@@ -256,7 +264,10 @@ function setupPdfDownload() {
         btn.setAttribute('data-initialized', 'true');
         btn.addEventListener('click', async () => {
             const container = document.querySelector('.container');
-            if (!container) return;
+            if (!container || typeof html2canvas === 'undefined' || typeof window.jspdf === 'undefined') {
+                alert('PDF generation libraries not available');
+                return;
+            }
             
             const clone = container.cloneNode(true);
 

@@ -1,10 +1,15 @@
 
-import React, { useState } from 'react';
-import { Upload, FileText, CheckCircle } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Upload, CheckCircle } from 'lucide-react';
 
-const FileUpload = () => {
+interface FileUploadProps {
+  onFileSelect?: (file: File) => void;
+}
+
+const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect }) => {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -23,28 +28,33 @@ const FileUpload = () => {
     
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
-      setSelectedFile(file);
-      
-      // Update the hidden file input for compatibility with main.js
-      const fileInput = document.getElementById('csvFile') as HTMLInputElement;
-      if (fileInput) {
-        const dataTransfer = new DataTransfer();
-        dataTransfer.items.add(file);
-        fileInput.files = dataTransfer.files;
-      }
+      handleFileSelection(file);
     }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+      handleFileSelection(e.target.files[0]);
+    }
+  };
+
+  const handleFileSelection = (file: File) => {
+    setSelectedFile(file);
+    
+    // Store file globally for main.js access
+    if (typeof window !== 'undefined') {
+      (window as any).selectedCsvFile = file;
+    }
+    
+    // Call callback if provided
+    if (onFileSelect) {
+      onFileSelect(file);
     }
   };
 
   const handleClick = () => {
-    const fileInput = document.getElementById('csvFile');
-    if (fileInput) {
-      fileInput.click();
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
     }
   };
 
@@ -91,8 +101,8 @@ const FileUpload = () => {
         </div>
         
         <input 
+          ref={fileInputRef}
           type="file" 
-          id="csvFile" 
           className="hidden" 
           accept=".csv"
           onChange={handleFileSelect}
