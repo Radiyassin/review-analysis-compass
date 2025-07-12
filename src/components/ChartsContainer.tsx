@@ -20,17 +20,7 @@ interface ChartData {
 
 const ChartsContainer = () => {
   const [chartData, setChartData] = useState<ChartData | null>(null);
-  const sentimentChartRef = useRef<HTMLCanvasElement>(null);
-  const distributionChartRef = useRef<HTMLCanvasElement>(null);
-  const countChartRef = useRef<HTMLCanvasElement>(null);
   
-  // Store chart instances for cleanup
-  const chartsRef = useRef<{
-    sentimentChart?: any;
-    distributionChart?: any;
-    countChart?: any;
-  }>({});
-
   useEffect(() => {
     console.log('📊 ChartsContainer component mounted');
 
@@ -75,201 +65,177 @@ const ChartsContainer = () => {
         unsubscribe();
       }
       window.removeEventListener('analysisCompleted', handleAnalysisComplete as EventListener);
-      
-      // Destroy all chart instances
-      Object.values(chartsRef.current).forEach(chart => {
-        if (chart && typeof chart.destroy === 'function') {
-          chart.destroy();
-        }
-      });
-      chartsRef.current = {};
     };
   }, []);
 
+  return (
+    <div className="chart-container grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+      {chartData ? (
+        <>
+          <ChartCard
+            title="Sentiment Scores"
+            icon={<BarChart3 className="h-5 w-5 text-blue-600" />}
+            data={chartData.sentiment}
+            chartType="bar"
+          />
+          <ChartCard
+            title="Review Distribution"
+            icon={<PieChart className="h-5 w-5 text-purple-600" />}
+            data={chartData.distribution}
+            chartType="doughnut"
+          />
+          <ChartCard
+            title="Review Counts"
+            icon={<TrendingUp className="h-5 w-5 text-green-600" />}
+            data={chartData.counts}
+            chartType="bar"
+          />
+        </>
+      ) : (
+        <>
+          <PlaceholderCard
+            title="Sentiment Scores"
+            icon={<BarChart3 className="h-5 w-5 text-blue-600" />}
+          />
+          <PlaceholderCard
+            title="Review Distribution"
+            icon={<PieChart className="h-5 w-5 text-purple-600" />}
+          />
+          <PlaceholderCard
+            title="Review Counts"
+            icon={<TrendingUp className="h-5 w-5 text-green-600" />}
+          />
+        </>
+      )}
+    </div>
+  );
+};
+
+interface ChartCardProps {
+  title: string;
+  icon: React.ReactNode;
+  data?: {
+    labels: string[];
+    means?: number[];
+    values?: number[];
+  };
+  chartType: 'bar' | 'doughnut';
+}
+
+const ChartCard: React.FC<ChartCardProps> = ({ title, icon, data, chartType }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const chartInstanceRef = useRef<any>(null);
+
   useEffect(() => {
-    // Only initialize charts when we have data and Chart.js is available
-    if (!chartData || typeof window === 'undefined' || !window.Chart) {
+    if (!data || !canvasRef.current || typeof window === 'undefined' || !window.Chart) {
       return;
     }
 
-    console.log('📊 Initializing charts with data:', chartData);
+    console.log(`📊 Initializing ${title} chart with data:`, data);
 
-    // Destroy existing charts before creating new ones
-    Object.values(chartsRef.current).forEach(chart => {
-      if (chart && typeof chart.destroy === 'function') {
-        chart.destroy();
+    // Destroy existing chart instance before creating new one
+    if (chartInstanceRef.current) {
+      try {
+        chartInstanceRef.current.destroy();
+        chartInstanceRef.current = null;
+      } catch (error) {
+        console.warn(`📊 Error destroying ${title} chart:`, error);
       }
-    });
-    chartsRef.current = {};
-
-    try {
-      // Initialize Sentiment Chart
-      if (sentimentChartRef.current && chartData.sentiment) {
-        chartsRef.current.sentimentChart = new window.Chart(sentimentChartRef.current, {
-          type: 'bar',
-          data: {
-            labels: chartData.sentiment.labels || ['Positive', 'Negative'],
-            datasets: [{
-              label: 'Sentiment Scores',
-              data: chartData.sentiment.means || [0, 0],
-              backgroundColor: ['#10B981', '#EF4444']
-            }]
-          },
-          options: { 
-            responsive: true, 
-            plugins: { legend: { display: false } },
-            maintainAspectRatio: false
-          }
-        });
-      }
-
-      // Initialize Distribution Chart
-      if (distributionChartRef.current && chartData.distribution) {
-        chartsRef.current.distributionChart = new window.Chart(distributionChartRef.current, {
-          type: 'doughnut',
-          data: {
-            labels: chartData.distribution.labels || ['Positive', 'Neutral', 'Negative'],
-            datasets: [{
-              data: chartData.distribution.values || [0, 0, 0],
-              backgroundColor: ['#10B981', '#6B7280', '#EF4444']
-            }]
-          },
-          options: { 
-            responsive: true,
-            maintainAspectRatio: false
-          }
-        });
-      }
-
-      // Initialize Count Chart
-      if (countChartRef.current && chartData.counts) {
-        chartsRef.current.countChart = new window.Chart(countChartRef.current, {
-          type: 'bar',
-          data: {
-            labels: chartData.counts.labels || ['Total Reviews'],
-            datasets: [{
-              label: 'Count',
-              data: chartData.counts.values || [0],
-              backgroundColor: ['#3B82F6']
-            }]
-          },
-          options: { 
-            responsive: true, 
-            plugins: { legend: { display: false } },
-            maintainAspectRatio: false
-          }
-        });
-      }
-
-      console.log('📊 Charts initialized successfully');
-    } catch (error) {
-      console.error('📊 Error initializing charts:', error);
     }
 
-    // Cleanup function for this effect
-    return () => {
-      Object.values(chartsRef.current).forEach(chart => {
-        if (chart && typeof chart.destroy === 'function') {
-          chart.destroy();
+    try {
+      const ctx = canvasRef.current.getContext('2d');
+      if (!ctx) return;
+
+      // Clear the canvas
+      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+
+      let chartConfig: any = {
+        type: chartType,
+        options: { 
+          responsive: true, 
+          maintainAspectRatio: false,
+          plugins: { 
+            legend: { display: chartType === 'doughnut' }
+          }
         }
-      });
-      chartsRef.current = {};
+      };
+
+      if (chartType === 'bar') {
+        chartConfig.data = {
+          labels: data.labels || ['Default'],
+          datasets: [{
+            label: title,
+            data: data.means || data.values || [0],
+            backgroundColor: title.includes('Sentiment') ? ['#10B981', '#EF4444'] : ['#3B82F6']
+          }]
+        };
+      } else if (chartType === 'doughnut') {
+        chartConfig.data = {
+          labels: data.labels || ['Positive', 'Neutral', 'Negative'],
+          datasets: [{
+            data: data.values || [0, 0, 0],
+            backgroundColor: ['#10B981', '#6B7280', '#EF4444']
+          }]
+        };
+      }
+
+      chartInstanceRef.current = new window.Chart(ctx, chartConfig);
+      console.log(`📊 ${title} chart initialized successfully`);
+    } catch (error) {
+      console.error(`📊 Error initializing ${title} chart:`, error);
+    }
+
+    // Cleanup function
+    return () => {
+      if (chartInstanceRef.current) {
+        try {
+          chartInstanceRef.current.destroy();
+          chartInstanceRef.current = null;
+        } catch (error) {
+          console.warn(`📊 Error cleaning up ${title} chart:`, error);
+        }
+      }
     };
-  }, [chartData]); // Re-run when chartData changes
-
-  // Conditional rendering - only show charts when data is available
-  if (!chartData) {
-    return (
-      <div className="chart-container grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        <Card className="shadow-lg border-0 hover:shadow-xl transition-shadow duration-300">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <BarChart3 className="h-5 w-5 text-blue-600" />
-              Sentiment Scores
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="bg-white p-4 rounded-lg h-64 flex items-center justify-center">
-              <p className="text-gray-500">Waiting for analysis data...</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-lg border-0 hover:shadow-xl transition-shadow duration-300">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <PieChart className="h-5 w-5 text-purple-600" />
-              Review Distribution
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="bg-white p-4 rounded-lg h-64 flex items-center justify-center">
-              <p className="text-gray-500">Waiting for analysis data...</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-lg border-0 hover:shadow-xl transition-shadow duration-300">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <TrendingUp className="h-5 w-5 text-green-600" />
-              Review Counts
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="bg-white p-4 rounded-lg h-64 flex items-center justify-center">
-              <p className="text-gray-500">Waiting for analysis data...</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  }, [data, title, chartType]);
 
   return (
-    <div className="chart-container grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-      <Card className="shadow-lg border-0 hover:shadow-xl transition-shadow duration-300">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <BarChart3 className="h-5 w-5 text-blue-600" />
-            Sentiment Scores
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="bg-white p-4 rounded-lg h-64">
-            <canvas ref={sentimentChartRef}></canvas>
-          </div>
-        </CardContent>
-      </Card>
+    <Card className="shadow-lg border-0 hover:shadow-xl transition-shadow duration-300">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-lg">
+          {icon}
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="bg-white p-4 rounded-lg h-64">
+          <canvas ref={canvasRef}></canvas>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
 
-      <Card className="shadow-lg border-0 hover:shadow-xl transition-shadow duration-300">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <PieChart className="h-5 w-5 text-purple-600" />
-            Review Distribution
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="bg-white p-4 rounded-lg h-64">
-            <canvas ref={distributionChartRef}></canvas>
-          </div>
-        </CardContent>
-      </Card>
+interface PlaceholderCardProps {
+  title: string;
+  icon: React.ReactNode;
+}
 
-      <Card className="shadow-lg border-0 hover:shadow-xl transition-shadow duration-300">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <TrendingUp className="h-5 w-5 text-green-600" />
-            Review Counts
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="bg-white p-4 rounded-lg h-64">
-            <canvas ref={countChartRef}></canvas>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+const PlaceholderCard: React.FC<PlaceholderCardProps> = ({ title, icon }) => {
+  return (
+    <Card className="shadow-lg border-0 hover:shadow-xl transition-shadow duration-300">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-lg">
+          {icon}
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="bg-white p-4 rounded-lg h-64 flex items-center justify-center">
+          <p className="text-gray-500">Waiting for analysis data...</p>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
