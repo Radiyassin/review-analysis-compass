@@ -13,40 +13,47 @@ const SalesForecast = () => {
   const [trendData, setTrendData] = useState<SalesTrendData | null>(null);
 
   useEffect(() => {
-    console.log('SalesForecast component mounted');
+    console.log('📈 SalesForecast component mounted');
 
     // Function to update trend data
     const updateTrendData = (data: SalesTrendData) => {
-      console.log('SalesForecast: Updating trend data:', data);
+      console.log('📈 SalesForecast: Updating trend data:', data);
       setTrendData(data);
     };
 
     // Listen for sales trend updates from main.js
     const handleSalesTrendUpdate = (event: CustomEvent) => {
-      console.log('SalesForecast: Received salesTrendUpdate event:', event.detail);
+      console.log('📈 SalesForecast: Received salesTrendUpdate event:', event.detail);
       if (event.detail && typeof event.detail === 'object') {
         updateTrendData(event.detail);
+      } else {
+        console.warn('📈 SalesForecast: Invalid trend data received:', event.detail);
       }
     };
 
     // Add event listener
     window.addEventListener('salesTrendUpdate', handleSalesTrendUpdate as EventListener);
+    console.log('📈 SalesForecast: Event listener added for salesTrendUpdate');
     
     // Also listen for analysis completion to check for data
     const handleAnalysisComplete = () => {
-      console.log('SalesForecast: Analysis completed, checking for data...');
+      console.log('📈 SalesForecast: Analysis completed, checking for global data...');
       setTimeout(() => {
         if (typeof window !== 'undefined' && (window as any).currentSalesTrend) {
           const salesTrend = (window as any).currentSalesTrend;
-          console.log('SalesForecast: Found sales trend after analysis:', salesTrend);
+          console.log('📈 SalesForecast: Found sales trend in global data:', salesTrend);
           updateTrendData(salesTrend);
+        } else {
+          console.warn('📈 SalesForecast: No sales trend found in global data');
         }
-      }, 500); // Small delay to ensure data is set
+      }, 1000); // Longer delay to ensure data is set
     };
 
     window.addEventListener('analysisCompleted', handleAnalysisComplete);
+    console.log('📈 SalesForecast: Event listener added for analysisCompleted');
 
     return () => {
+      console.log('📈 SalesForecast: Removing event listeners');
       window.removeEventListener('salesTrendUpdate', handleSalesTrendUpdate as EventListener);
       window.removeEventListener('analysisCompleted', handleAnalysisComplete);
     };
@@ -86,6 +93,8 @@ const SalesForecast = () => {
     if (!trendData) return "Loading forecast data...";
     return trendData.message || "Analysis complete.";
   };
+
+  console.log('📈 SalesForecast: Rendering with data:', trendData);
 
   return (
     <Card className="shadow-lg border-0 bg-gradient-to-r from-green-50 to-blue-50">
