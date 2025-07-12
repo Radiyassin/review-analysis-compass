@@ -9,12 +9,13 @@ window.addEventListener('load', () => {
 });
 
 async function analyze() {
-    // Get file from React component instead of DOM element
     const file = (window as any).selectedCsvFile;
     if (!file) {
         alert('Please select a CSV file');
         return;
     }
+
+    console.log('Starting analysis with file:', file.name);
 
     const analyzeBtn = document.querySelector('button[onclick="analyze()"]') || 
                       document.querySelector('.btn-blue');
@@ -27,6 +28,7 @@ async function analyze() {
         const formData = new FormData();
         formData.append('file', file);
 
+        console.log('Sending file to server...');
         const response = await fetch('/api/upload', {
             method: 'POST',
             body: formData
@@ -46,20 +48,47 @@ async function analyze() {
             resultsElement.style.display = 'block';
         }
 
+        // Store data globally and dispatch events for React components
+        if (typeof window !== 'undefined') {
+            (window as any).currentSentimentScore = data.sentiment_score;
+            (window as any).currentSalesTrend = data.sales_trend;
+            (window as any).currentProductInfo = data.product_info;
+            (window as any).currentChartData = data.chart_data;
+            (window as any).currentPhrases = data.common_phrases || [];
+        }
+
+        // Dispatch custom events for React components
         setTimeout(() => {
-            renderSentimentStars(data.sentiment_score);
-        }, 50);
+            // Update sentiment stars
+            window.dispatchEvent(new CustomEvent('sentimentDataUpdate', {
+                detail: { sentimentScore: data.sentiment_score }
+            }));
+
+            // Update sales forecast
+            window.dispatchEvent(new CustomEvent('salesTrendUpdate', {
+                detail: data.sales_trend
+            }));
+            
+            // Update product info
+            updateProductInfo(data.product_info);
+            
+            // Update charts
+            renderCharts(data.chart_data);
+            
+            // Update phrases
+            renderPhrases(data.common_phrases || []);
+            
+            // Update word cloud
+            renderWordCloud(data.common_phrases || []);
+        }, 100);
 
         setupPdfDownload();
-        updateProductInfo(data.product_info);
-        renderCharts(data.chart_data);
-        renderPhrases(data.common_phrases || []);
-        renderWordCloud(data.common_phrases || []);
-        renderSalesTrend(data.sales_trend);
 
         if (data.rating_stats) {
             renderRatingStats(data.rating_stats);
         }
+
+        console.log('Analysis completed successfully');
 
     } catch (err) {
         console.error('Analysis error:', err);
@@ -73,6 +102,7 @@ async function analyze() {
 }
 
 function updateProductInfo(info) {
+    console.log('Updating product info:', info);
     const productNameEl = document.getElementById('productName');
     const brandNameEl = document.getElementById('brandName');
     const priceEl = document.getElementById('price');
@@ -86,6 +116,8 @@ function updateProductInfo(info) {
 }
 
 function renderCharts(data) {
+    console.log('Rendering charts with data:', data);
+    
     if (sentimentChart) sentimentChart.destroy();
     if (distributionChart) distributionChart.destroy();
     if (countChart) countChart.destroy();
@@ -113,6 +145,7 @@ function renderCharts(data) {
                 }
             }
         });
+        console.log('Sentiment chart created');
     }
 
     if (distributionChartEl && typeof Chart !== 'undefined') {
@@ -127,6 +160,7 @@ function renderCharts(data) {
                 }]
             }
         });
+        console.log('Distribution chart created');
     }
 
     if (countChartEl && typeof Chart !== 'undefined') {
@@ -148,10 +182,12 @@ function renderCharts(data) {
                 }
             }
         });
+        console.log('Count chart created');
     }
 }
 
 function renderPhrases(phrases) {
+    console.log('Rendering phrases:', phrases);
     const ul = document.getElementById('phraseList');
     if (ul) {
         ul.innerHTML = phrases.length
@@ -161,13 +197,19 @@ function renderPhrases(phrases) {
 }
 
 function renderWordCloud(phrases) {
+    console.log('Rendering word cloud:', phrases);
     const container = document.getElementById('wordCloud');
-    if (!container || typeof d3 === 'undefined') return;
+    if (!container) return;
     
     container.innerHTML = '';
 
     if (!phrases.length) {
         container.innerHTML = '<p>No words for word cloud</p>';
+        return;
+    }
+
+    if (typeof d3 === 'undefined') {
+        container.innerHTML = '<p>D3 library not available for word cloud</p>';
         return;
     }
 
@@ -214,50 +256,6 @@ function renderRatingStats(stats) {
     console.log("Rating stats:", stats);
 }
 
-function renderSentimentStars(sentimentScore) {
-    const container = document.getElementById('sentimentStars');
-    if (!container) {
-        console.error("Element with ID 'sentimentStars' not found.");
-        return;
-    }
-
-    const clampedScore = Math.max(-1, Math.min(1, sentimentScore));
-    const scoreOutOf5 = ((clampedScore + 1) / 2) * 5;
-
-    const fullStars = Math.floor(scoreOutOf5);
-    const halfStar = scoreOutOf5 - fullStars >= 0.5;
-    const emptyStars = 5 - fullStars - (halfStar ? 1 : 0);
-
-    container.innerHTML = '<h3>Predicted Sentiment Rating</h3>';
-    const starsContainer = document.createElement('div');
-    starsContainer.className = 'stars-display';
-
-    for (let i = 0; i < fullStars; i++) {
-        const star = document.createElement('i');
-        star.className = 'fas fa-star';
-        starsContainer.appendChild(star);
-    }
-
-    if (halfStar) {
-        const star = document.createElement('i');
-        star.className = 'fas fa-star-half-alt';
-        starsContainer.appendChild(star);
-    }
-
-    for (let i = 0; i < emptyStars; i++) {
-        const star = document.createElement('i');
-        star.className = 'far fa-star';
-        starsContainer.appendChild(star);
-    }
-
-    const ratingText = document.createElement('span');
-    ratingText.id = 'starText';
-    ratingText.textContent = ` (${scoreOutOf5.toFixed(1)}/5)`;
-
-    container.appendChild(starsContainer);
-    container.appendChild(ratingText);
-}
-
 function setupPdfDownload() {
     const btn = document.getElementById('downloadPdfBtn');
     if (btn && !btn.hasAttribute('data-initialized')) {
@@ -300,30 +298,6 @@ function setupPdfDownload() {
             }
         });
     }
-}
-
-function renderSalesTrend(trendData) {
-    const el = document.getElementById('salesTrendMessage');
-    if (!trendData || !el) return;
-
-    let explanation = "";
-    switch (trendData.trend) {
-        case 'Up':
-            explanation = "Customers are mostly satisfied, so the product is likely to sell well.";
-            break;
-        case 'Down':
-            explanation = "Many customers are unhappy, which may reduce future sales.";
-            break;
-        case 'Stable':
-            explanation = "Customer opinions are mixed, so sales are expected to stay the same.";
-            break;
-    }
-
-    const icon = trendData.trend === 'Up' ? '📈'
-                : trendData.trend === 'Down' ? '📉'
-                : '➡️';
-
-    el.innerHTML = `${icon} <strong>${trendData.trend}</strong> — ${explanation}`;
 }
 
 function toggleChatbot() {
@@ -377,10 +351,8 @@ function appendMessage(sender, text) {
 window.analyze = analyze;
 window.toggleChatbot = toggleChatbot;
 window.askBot = askBot;
-window.renderSentimentStars = renderSentimentStars;
 window.updateProductInfo = updateProductInfo;
 window.renderCharts = renderCharts;
 window.renderPhrases = renderPhrases;
 window.renderWordCloud = renderWordCloud;
-window.renderSalesTrend = renderSalesTrend;
 window.setupPdfDownload = setupPdfDownload;

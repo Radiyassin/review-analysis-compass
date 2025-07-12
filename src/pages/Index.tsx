@@ -11,6 +11,7 @@ import WordCloud from '@/components/WordCloud';
 import CommonPhrases from '@/components/CommonPhrases';
 import Chatbot from '@/components/Chatbot';
 import IntroGif from '@/components/IntroGif';
+import SalesForecast from '@/components/SalesForecast';
 
 const Index = () => {
   const [showResults, setShowResults] = useState(false);
@@ -119,17 +120,7 @@ const Index = () => {
             <SentimentStars />
 
             {/* Sales Forecast */}
-            <Card className="shadow-lg border-0 bg-gradient-to-r from-green-50 to-blue-50">
-              <CardContent className="p-6">
-                <div id="salesTrend" className="info-box">
-                  <h3 className="text-xl font-semibold text-gray-800 mb-2 flex items-center gap-2">
-                    <TrendingUp className="h-6 w-6 text-green-600" />
-                    Sales Forecast
-                  </h3>
-                  <p id="salesTrendMessage" className="text-gray-600">Loading forecast data...</p>
-                </div>
-              </CardContent>
-            </Card>
+            <SalesForecast />
 
             {/* Charts Container */}
             <ChartsContainer />

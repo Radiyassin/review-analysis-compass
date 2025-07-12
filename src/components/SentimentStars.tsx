@@ -1,24 +1,81 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Star } from 'lucide-react';
 
 const SentimentStars = () => {
+  const [sentimentData, setSentimentData] = useState({
+    score: 0,
+    rating: 0
+  });
+
+  useEffect(() => {
+    // Listen for sentiment data updates from main.js
+    const handleSentimentUpdate = (event: CustomEvent) => {
+      const { sentimentScore } = event.detail;
+      const clampedScore = Math.max(-1, Math.min(1, sentimentScore));
+      const scoreOutOf5 = ((clampedScore + 1) / 2) * 5;
+      
+      setSentimentData({
+        score: sentimentScore,
+        rating: scoreOutOf5
+      });
+    };
+
+    window.addEventListener('sentimentDataUpdate', handleSentimentUpdate as EventListener);
+    
+    // Also check if window has the data already
+    if (typeof window !== 'undefined' && (window as any).currentSentimentScore) {
+      const sentimentScore = (window as any).currentSentimentScore;
+      const clampedScore = Math.max(-1, Math.min(1, sentimentScore));
+      const scoreOutOf5 = ((clampedScore + 1) / 2) * 5;
+      
+      setSentimentData({
+        score: sentimentScore,
+        rating: scoreOutOf5
+      });
+    }
+
+    return () => {
+      window.removeEventListener('sentimentDataUpdate', handleSentimentUpdate as EventListener);
+    };
+  }, []);
+
+  const renderStars = () => {
+    const fullStars = Math.floor(sentimentData.rating);
+    const hasHalfStar = sentimentData.rating - fullStars >= 0.5;
+    const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+
+    return (
+      <div className="flex items-center justify-center gap-1">
+        {[...Array(fullStars)].map((_, i) => (
+          <Star key={`full-${i}`} className="h-6 w-6 fill-yellow-400 text-yellow-400" />
+        ))}
+        {hasHalfStar && (
+          <div className="relative">
+            <Star className="h-6 w-6 text-gray-300" />
+            <div className="absolute top-0 left-0 overflow-hidden w-1/2">
+              <Star className="h-6 w-6 fill-yellow-400 text-yellow-400" />
+            </div>
+          </div>
+        )}
+        {[...Array(emptyStars)].map((_, i) => (
+          <Star key={`empty-${i}`} className="h-6 w-6 text-gray-300" />
+        ))}
+      </div>
+    );
+  };
+
   return (
     <Card className="shadow-lg border-0 bg-gradient-to-r from-yellow-50 to-orange-50">
       <CardContent className="p-6">
         <div className="text-center">
           <h3 className="text-xl font-semibold text-gray-800 mb-4">Overall Sentiment Rating</h3>
-          <div id="sentimentStars" className="rating-display flex items-center justify-center gap-4">
-            <div className="stars-outer relative">
-              <div className="stars-inner absolute top-0 left-0 overflow-hidden text-yellow-400 text-2xl" style={{width: '80%'}}>
-                ★★★★★
-              </div>
-              <div className="text-gray-300 text-2xl">
-                ★★★★★
-              </div>
-            </div>
-            <span id="starText" className="text-lg font-bold text-gray-700">(4.0/5)</span>
+          <div className="rating-display flex flex-col items-center justify-center gap-4">
+            {renderStars()}
+            <span className="text-lg font-bold text-gray-700">
+              ({sentimentData.rating.toFixed(1)}/5)
+            </span>
           </div>
           <p className="text-sm text-gray-600 mt-2">Based on sentiment analysis of customer reviews</p>
         </div>
