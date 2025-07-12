@@ -15,65 +15,52 @@ const SalesForecast = () => {
   useEffect(() => {
     console.log('📈 SalesForecast component mounted');
 
-    // Function to update trend data
-    const updateTrendData = (data: SalesTrendData) => {
-      console.log('📈 SalesForecast: Updating with data:', data);
-      setTrendData(data);
-    };
-
     let unsubscribe: (() => void) | null = null;
     
     const initializeDataStore = () => {
       if (typeof window !== 'undefined' && window.dataStore) {
-        console.log('📈 SalesForecast: Data store found, subscribing');
+        console.log('📈 SalesForecast: DataStore found, subscribing');
         
         // Check for existing data
         const existingTrend = window.dataStore.getData('salesTrend');
         if (existingTrend && typeof existingTrend === 'object') {
-          console.log('📈 SalesForecast: Found existing trend:', existingTrend);
-          updateTrendData(existingTrend);
+          setTrendData(existingTrend);
         }
         
         // Subscribe to changes
         unsubscribe = window.dataStore.subscribe((key: string, value: any) => {
-          console.log('📈 SalesForecast: Data store update:', key, value);
           if (key === 'salesTrend' && value && typeof value === 'object') {
-            updateTrendData(value);
+            setTrendData(value);
           }
         });
-      } else {
-        console.log('📈 SalesForecast: Data store not available, will retry...');
-        // Retry after a short delay
-        setTimeout(initializeDataStore, 100);
       }
     };
 
-    // Try to initialize immediately
+    // Initialize immediately
     initializeDataStore();
 
-    // Also listen for the analysis completion event
+    // Listen for analysis completion event
     const handleAnalysisComplete = (event: CustomEvent) => {
-      console.log('📈 SalesForecast: Analysis completed event received', event.detail);
+      console.log('📈 SalesForecast: Analysis completed event received');
       if (event.detail && event.detail.sales_trend) {
-        updateTrendData(event.detail.sales_trend);
+        setTrendData(event.detail.sales_trend);
       }
     };
 
     window.addEventListener('analysisCompleted', handleAnalysisComplete as EventListener);
 
+    // Cleanup function
     return () => {
+      console.log('📈 SalesForecast: Cleaning up');
       if (unsubscribe) {
-        console.log('📈 SalesForecast: Cleaning up subscription');
         unsubscribe();
       }
       window.removeEventListener('analysisCompleted', handleAnalysisComplete as EventListener);
     };
   }, []);
 
-  const getTrendIcon = () => {
-    if (!trendData) return <TrendingUp className="h-6 w-6 text-green-600" />;
-    
-    switch (trendData.trend) {
+  const getTrendIcon = (trend?: string) => {
+    switch (trend) {
       case 'Up':
         return <TrendingUp className="h-6 w-6 text-green-600" />;
       case 'Down':
@@ -81,14 +68,12 @@ const SalesForecast = () => {
       case 'Stable':
         return <Minus className="h-6 w-6 text-blue-600" />;
       default:
-        return <TrendingUp className="h-6 w-6 text-green-600" />;
+        return <TrendingUp className="h-6 w-6 text-gray-400" />;
     }
   };
 
-  const getTrendColor = () => {
-    if (!trendData) return 'text-gray-600';
-    
-    switch (trendData.trend) {
+  const getTrendColor = (trend?: string) => {
+    switch (trend) {
       case 'Up':
         return 'text-green-700';
       case 'Down':
@@ -100,28 +85,47 @@ const SalesForecast = () => {
     }
   };
 
+  // Conditional rendering - only show content when data is available
+  if (!trendData) {
+    return (
+      <Card className="shadow-lg border-0 bg-gradient-to-r from-green-50 to-blue-50">
+        <CardContent className="p-6">
+          <div className="info-box">
+            <h3 className="text-xl font-semibold text-gray-800 mb-2 flex items-center gap-2">
+              {getTrendIcon()}
+              Sales Forecast
+            </h3>
+            <div className="flex items-center gap-2">
+              <span className="text-gray-600 font-bold">Loading...</span>
+              <span className="text-gray-600">—</span>
+              <span className="text-gray-600">Waiting for analysis data...</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="shadow-lg border-0 bg-gradient-to-r from-green-50 to-blue-50">
       <CardContent className="p-6">
         <div className="info-box">
           <h3 className="text-xl font-semibold text-gray-800 mb-2 flex items-center gap-2">
-            {getTrendIcon()}
+            {getTrendIcon(trendData.trend)}
             Sales Forecast
           </h3>
           <div className="flex items-center gap-2">
-            <span className={`font-bold ${getTrendColor()}`}>
-              {trendData?.trend || 'Loading...'}
+            <span className={`font-bold ${getTrendColor(trendData.trend)}`}>
+              {trendData.trend}
             </span>
             <span className="text-gray-600">—</span>
             <span className="text-gray-600">
-              {trendData?.message || "Loading forecast data..."}
+              {trendData.message}
             </span>
           </div>
-          {trendData && (
-            <p className="text-sm text-gray-500 mt-2">
-              Average sentiment: {trendData.avg_sentiment.toFixed(3)}
-            </p>
-          )}
+          <p className="text-sm text-gray-500 mt-2">
+            Average sentiment: {trendData.avg_sentiment.toFixed(3)}
+          </p>
         </div>
       </CardContent>
     </Card>
