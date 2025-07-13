@@ -317,17 +317,38 @@ def upload_file():
 @main_bp.route('/api/chat', methods=['POST'])
 def chat():
     try:
-        if not current_app.config.get('OPENAI_API_KEY'):
-            return jsonify({'answer': "OpenAI API key not configured. Please set OPENAI_API_KEY environment variable."})
-
-        client = openai.OpenAI(api_key=current_app.config['OPENAI_API_KEY'])
-
-        question = request.json.get('question', '')
+        print(f"Chat endpoint called")
+        
+        # Get the question from request
+        data = request.get_json()
+        if not data:
+            return jsonify({'answer': "Invalid request - no JSON data received."})
+            
+        question = data.get('question', '').strip()
+        if not question:
+            return jsonify({'answer': "Please ask a question about your data."})
+        
+        print(f"Question: {question}")
+        
+        # Check for context (uploaded data)
         context = session.get('reviews_text', '')
         product_info = session.get('product_info', {})
-
+        
         if not context:
-            return jsonify({'answer': "Please upload a product review file first to enable chat functionality."})
+            return jsonify({'answer': "Please upload and analyze a CSV file first to enable chat functionality."})
+        
+        print(f"Context available: {len(context)} characters")
+        print(f"Product info: {product_info}")
+        
+        # Check if OpenAI API key is configured
+        openai_key = current_app.config.get('OPENAI_API_KEY')
+        if not openai_key or openai_key == 'your-openai-key-here':
+            print("OpenAI API key not configured, using local responses")
+            # Return a local response when API key is not available
+            return jsonify({'answer': generate_local_chat_response(question, context, product_info)})
+
+        # Use OpenAI API if key is available
+        client = openai.OpenAI(api_key=openai_key)
 
         prompt = f"""You are a helpful assistant analyzing customer reviews for this product:
 Product: {product_info.get('Product Name', 'Unknown')}
@@ -354,8 +375,60 @@ Please provide a helpful answer based on the reviews and product information."""
         )
         
         answer = response.choices[0].message.content
+        print(f"OpenAI response: {answer}")
         return jsonify({'answer': answer})
         
     except Exception as e:
         print(f"Chat error: {str(e)}")
-        return jsonify({'answer': f"Sorry, there was an error processing your question: {str(e)}"})
+        traceback.print_exc()
+        # Fallback to local response on any error
+        try:
+            context = session.get('reviews_text', '')
+            product_info = session.get('product_info', {})
+            question = request.get_json().get('question', '') if request.get_json() else ''
+            return jsonify({'answer': generate_local_chat_response(question, context, product_info)})
+        except:
+            return jsonify({'answer': "Sorry, I'm having trouble processing your question right now. Please try again."})
+
+def generate_local_chat_response(question, context, product_info):
+    """Generate a response using local analysis when OpenAI API is not available"""
+    question_lower = question.lower()
+    
+    # Product information responses
+    if any(word in question_lower for word in ['product', 'name', 'what is']):
+        product_name = product_info.get('Product Name', 'Unknown Product')
+        brand_name = product_info.get('Brand Name', 'Unknown Brand')
+        price = product_info.get('Price', 'N/A')
+        return f"This analysis is for {product_name} by {brand_name}, priced at {price}."
+    
+    # Sentiment-related questions
+    if any(word in question_lower for word in ['sentiment', 'feeling', 'opinion', 'positive', 'negative']):
+        return "Based on the uploaded reviews, I can see the overall sentiment analysis. The data shows how customers feel about this product. You can see the detailed sentiment breakdown in the charts above."
+    
+    # Sales trend questions
+    if any(word in question_lower for word in ['sales', 'trend', 'forecast', 'future', 'sell']):
+        return "The sales forecast is based on customer sentiment analysis. Positive reviews typically indicate good sales potential, while negative reviews might suggest challenges. Check the sales forecast section above for detailed predictions."
+    
+    # Review count questions
+    if any(word in question_lower for word in ['how many', 'count', 'total', 'number']):
+        return "I analyzed all the reviews from your uploaded CSV file. You can see the exact numbers in the statistics section above, including total reviews and their sentiment breakdown."
+    
+    # Common phrases questions
+    if any(word in question_lower for word in ['phrase', 'keyword', 'common', 'mention', 'say']):
+        return "The analysis identified common phrases and keywords from customer reviews. You can see these in the 'Common Phrases' and 'Word Cloud' sections above."
+    
+    # Improvement questions
+    if any(word in question_lower for word in ['improve', 'better', 'fix', 'problem', 'issue']):
+        return "Based on the sentiment analysis, you can identify areas for improvement by looking at negative reviews and common complaint phrases. The analysis shows what customers are saying about your product."
+    
+    # Default helpful response
+    return """I can help you understand your review analysis! Try asking me about:
+    
+    • Product information ("What product is this?")
+    • Overall sentiment ("What's the sentiment like?")
+    • Sales trends ("How might this affect sales?")
+    • Review statistics ("How many reviews were analyzed?")
+    • Common feedback ("What do customers commonly mention?")
+    • Areas for improvement ("What can be improved?")
+    
+    The detailed analysis is shown in the charts and sections above."""
